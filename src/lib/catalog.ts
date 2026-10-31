@@ -48,7 +48,8 @@ export function findTitle(id: number): Title | undefined {
 
 /** A deterministic "à la une" rotation: changes daily, no backend needed. */
 export function dailyPicks(count = 3): Title[] {
-  const pool = CATALOG.filter((t) => t.poster && (t.year ?? 0) >= 2000);
+  // Short titles only: the hero renders them in one oversized metal line.
+  const pool = CATALOG.filter((t) => t.poster && (t.year ?? 0) >= 2000 && t.title.length <= 24);
   const seed = Math.floor(Date.now() / 86_400_000);
   const picks: Title[] = [];
   for (let i = 0; i < count * 4 && picks.length < count; i++) {

@@ -122,7 +122,6 @@ export default function PlayerModal({ subject, onClose }: PlayerModalProps) {
               src={src}
               title={`Lecteur ${subject.title}`}
               allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-              allowFullScreen
               referrerPolicy="no-referrer"
             />
           )}
