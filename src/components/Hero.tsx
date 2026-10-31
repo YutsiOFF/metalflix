@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, Play, Sparkles } from "lucide-react";
 import type { Title } from "../lib/catalog";
 import { GENRE_LABEL } from "../lib/catalog";
@@ -14,6 +14,9 @@ const ROTATE_MS = 9000;
  * Several titles at a time, each with its own artwork behind the headline: one
  * still is a lot of empty black, and the shader headline made it worse by
  * drawing attention to the emptiness. Static type, moving pictures.
+ *
+ * The dots sit in the middle of the hero and the active one fills over the same
+ * interval as the rotation, so the change is expected instead of sudden.
  */
 export default function Hero({ items, onPlay }: HeroProps) {
   const [index, setIndex] = useState(0);
@@ -41,6 +44,7 @@ export default function Hero({ items, onPlay }: HeroProps) {
       className="mf-hero"
       aria-roledescription="carrousel"
       aria-label="À la une"
+      style={{ "--mf-rotate": `${ROTATE_MS}ms` } as CSSProperties}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
@@ -92,7 +96,7 @@ export default function Hero({ items, onPlay }: HeroProps) {
       </div>
 
       {count > 1 ? (
-        <div className="mf-hero__nav">
+        <div className={`mf-hero__nav${paused ? " is-paused" : ""}`}>
           <button type="button" className="mf-hero__arrow" aria-label="Titre précédent" onClick={() => go(-1)}>
             <ChevronLeft size={16} />
           </button>
@@ -105,7 +109,9 @@ export default function Hero({ items, onPlay }: HeroProps) {
                 aria-label={`Voir ${entry.title}`}
                 aria-current={position === index ? "true" : undefined}
                 onClick={() => setIndex(position)}
-              />
+              >
+                <span className="mf-hero__fill" />
+              </button>
             ))}
           </div>
           <button type="button" className="mf-hero__arrow" aria-label="Titre suivant" onClick={() => go(1)}>

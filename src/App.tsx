@@ -7,10 +7,10 @@ import {
   PAGE_SIZE,
   countByCategory,
   dailyPicks,
-  decadesOf,
   findTitle,
   loadCatalog,
   searchTitles,
+  yearsOf,
   type Category,
   type GenreKey,
   type Title,
@@ -28,6 +28,7 @@ import {
   type Library,
   type LibraryItem,
 } from "./lib/library";
+import Dropdown from "./components/Dropdown";
 import Hero from "./components/Hero";
 import PosterCard from "./components/PosterCard";
 import PlayerModal, { type PlaySubject } from "./components/PlayerModal";
@@ -71,7 +72,7 @@ export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [filter, setFilter] = useState<Filter>("all");
   const [genre, setGenre] = useState<GenreKey | "all">("all");
-  const [decade, setDecade] = useState<number | "all">("all");
+  const [year, setYear] = useState<number | "all">("all");
   const [sort, setSort] = useState<Sort>("default");
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -86,7 +87,28 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   const featured = useMemo(() => (catalog.length ? dailyPicks(catalog, 6) : []), [catalog]);
-  const decades = useMemo(() => decadesOf(catalog), [catalog]);
+
+  const genreOptions = useMemo(() => {
+    const counts = new Map<GenreKey, number>();
+    for (const item of catalog) for (const key of item.genres) counts.set(key, (counts.get(key) ?? 0) + 1);
+    return [
+      { value: "all", label: "Tous les genres", count: catalog.length },
+      ...GENRE_ORDER.map((key) => ({ value: key, label: GENRE_LABEL[key], count: counts.get(key) ?? 0 })),
+    ];
+  }, [catalog]);
+
+  const yearOptions = useMemo(
+    () => [
+      { value: "all", label: "Toutes les années", count: catalog.length },
+      ...yearsOf(catalog).map(({ year: value, count }) => ({ value: String(value), label: String(value), count })),
+    ],
+    [catalog],
+  );
+
+  const sortOptions = useMemo(
+    () => (Object.keys(SORT_LABEL) as Sort[]).map((value) => ({ value, label: SORT_LABEL[value] })),
+    [],
+  );
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
@@ -106,7 +128,7 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => setVisible(PAGE_SIZE), [filter, genre, decade, sort, query]);
+  useEffect(() => setVisible(PAGE_SIZE), [filter, genre, year, sort, query]);
 
   const wantedIds = useMemo(() => new Set(library.watchlist.map((item) => item.id)), [library.watchlist]);
 
@@ -116,9 +138,9 @@ export default function App() {
         (item) =>
           (filter === "all" || item.category === filter) &&
           (genre === "all" || item.genres.includes(genre)) &&
-          (decade === "all" || (item.year ? Math.floor(item.year / 10) * 10 === decade : false)),
+          (year === "all" || item.year === year),
       ),
-    [catalog, filter, genre, decade],
+    [catalog, filter, genre, year],
   );
 
   const results = useMemo(() => {
@@ -128,7 +150,7 @@ export default function App() {
     return list;
   }, [filtered, query, sort]);
 
-  const searchMode = query.trim().length > 0 || filter !== "all" || genre !== "all" || decade !== "all" || sort !== "default";
+  const searchMode = query.trim().length > 0 || filter !== "all" || genre !== "all" || year !== "all" || sort !== "default";
   const numeric = /^\d+$/.test(query.trim());
   const numericHit = numeric ? findTitle(catalog, Number(query.trim())) : undefined;
 
@@ -140,7 +162,7 @@ export default function App() {
     () =>
       (["film", "serie", "anime"] as Category[]).map((category) => ({
         category,
-        items: catalog.filter((item) => item.category === category).slice(0, 18),
+        items: catalog.filter((item) => item.category === category).slice(0, 36),
       })),
     [catalog],
   );
@@ -226,7 +248,7 @@ export default function App() {
   function resetFilters() {
     setFilter("all");
     setGenre("all");
-    setDecade("all");
+    setYear("all");
     setSort("default");
     setQuery("");
   }
@@ -255,6 +277,25 @@ export default function App() {
               ×
             </button>
           ) : null}
+        </div>
+
+        <div className="mf-filters" role="group" aria-label="Filtres du catalogue">
+          <Dropdown
+            label="Genre"
+            value={genre}
+            options={genreOptions}
+            onChange={(value) => setGenre(value as GenreKey | "all")}
+          />
+          <Dropdown
+            label="Année"
+            value={String(year)}
+            options={yearOptions}
+            onChange={(value) => setYear(value === "all" ? "all" : Number(value))}
+          />
+          <Dropdown label="Tri" value={sort} options={sortOptions} onChange={(value) => setSort(value as Sort)} />
+          <button type="button" className="mf-btn mf-btn--sm" onClick={resetFilters}>
+            Réinitialiser
+          </button>
         </div>
 
         <button
@@ -305,53 +346,12 @@ export default function App() {
                     type="button"
                     role="tab"
                     aria-selected={filter === value}
-                    className={`mf-seg__btn${filter === value ? " is-active" : ""}`}
+                    className={`mf-seg__btn mf-seg__btn--${value}${filter === value ? " is-active" : ""}`}
                     onClick={() => setFilter(value)}
                   >
                     {CATEGORY_LABEL[value]}
                   </button>
                 ))}
-              </div>
-
-              <div className="mf-filters">
-                <label className="mf-select">
-                  <span>Genre</span>
-                  <select value={genre} onChange={(event) => setGenre(event.target.value as GenreKey | "all")}>
-                    <option value="all">Tous</option>
-                    {GENRE_ORDER.map((key) => (
-                      <option key={key} value={key}>
-                        {GENRE_LABEL[key]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="mf-select">
-                  <span>Année</span>
-                  <select
-                    value={String(decade)}
-                    onChange={(event) => setDecade(event.target.value === "all" ? "all" : Number(event.target.value))}
-                  >
-                    <option value="all">Toutes</option>
-                    {decades.map((value) => (
-                      <option key={value} value={value}>
-                        {value}s
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="mf-select">
-                  <span>Tri</span>
-                  <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
-                    {(Object.keys(SORT_LABEL) as Sort[]).map((value) => (
-                      <option key={value} value={value}>
-                        {SORT_LABEL[value]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button type="button" className="mf-btn mf-btn--sm" onClick={resetFilters}>
-                  Réinitialiser
-                </button>
               </div>
 
               <p className="mf-count">

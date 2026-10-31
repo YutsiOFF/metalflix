@@ -139,11 +139,16 @@ export function findTitle(list: Title[], id: number): Title | undefined {
   return list.find((item) => item.id === id);
 }
 
-/** Decades present in the catalogue, newest first. */
-export function decadesOf(list: Title[]): number[] {
-  const decades = new Set<number>();
-  for (const item of list) if (item.year) decades.add(Math.floor(item.year / 10) * 10);
-  return [...decades].sort((a, b) => b - a);
+/**
+ * Years present in the catalogue, newest first. Grouping by decade hid the
+ * current one behind a label that ends in 0, so the newest year looked missing.
+ */
+export function yearsOf(list: Title[]): { year: number; count: number }[] {
+  const counts = new Map<number, number>();
+  for (const item of list) if (item.year) counts.set(item.year, (counts.get(item.year) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([year, count]) => ({ year, count }))
+    .sort((a, b) => b.year - a.year);
 }
 
 /**
@@ -158,4 +163,4 @@ export function dailyPicks(list: Title[], count: number): Title[] {
   return Array.from({ length: Math.min(count, pool.length) }, (_, i) => pool[(start + i * 3) % pool.length]);
 }
 
-export const PAGE_SIZE = 60;
+export const PAGE_SIZE = 72;
