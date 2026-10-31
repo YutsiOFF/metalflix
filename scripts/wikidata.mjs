@@ -50,10 +50,17 @@ await sparql(
   "series",
 );
 
-// Anime: animated TV series whose country of origin is Japan, plus explicit genre.
-await sparql(
-  `SELECT ?tmdb WHERE {
-     ?item wdt:P136 wd:Q1107 ; wdt:P4983 ?tmdb .
-   } LIMIT 8000`,
-  "anime",
-);
+// Anime: no single Wikidata statement covers the genre, so union what does
+// resolve — "anime television series", the anime class itself, Japanese
+// animation, and an explicit anime genre. Together they classify ~4 000 shows.
+const anime = new Set();
+for (const [index, query] of [
+  `SELECT ?tmdb WHERE { ?item wdt:P31 wd:Q63952888 . ?item wdt:P4983 ?tmdb } LIMIT 8000`,
+  `SELECT ?tmdb WHERE { ?item wdt:P31 wd:Q1107 . ?item wdt:P4983 ?tmdb } LIMIT 8000`,
+  `SELECT ?tmdb WHERE { ?item wdt:P495 wd:Q17 ; wdt:P136 wd:Q202866 ; wdt:P4983 ?tmdb } LIMIT 8000`,
+  `SELECT ?tmdb WHERE { ?item wdt:P136 wd:Q1107 ; wdt:P4983 ?tmdb } LIMIT 8000`,
+].entries()) {
+  for (const id of await sparql(query, `anime-${index}`)) anime.add(id);
+}
+await writeFile(new URL("../.cache/wd-anime.json", import.meta.url), JSON.stringify([...anime]));
+console.log(`anime: ${anime.size} ids`);

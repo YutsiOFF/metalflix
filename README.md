@@ -3,16 +3,24 @@
 Catalogue de films, séries et animes dans un habillage **métal liquide** ([Argent](https://github.com/seangeng/argent)),
 avec le lecteur de [Moviez](https://api.moviez.ac).
 
-Site statique (Vite + React + TypeScript) publié sur GitHub Pages.
+Site statique (Vite + React + TypeScript) publié sur GitHub Pages : **https://yutsioff.github.io/metalflix/**
 
 ## Ce que fait le site
 
-- **Catalogue** de ~160 titres, chacun avec affiche, année, langues disponibles et nombre de saisons.
+- **Catalogue de 13 819 titres** (7 234 films, 5 379 séries, 1 206 animes), tous réellement servis par l'API Moviez,
+  avec affiche et année. Le catalogue vit dans son propre chunk (~1 Mo) pour que l'interface s'affiche sans l'attendre.
 - **Lecteur intégré** : `/api/check/<id>` puis `<iframe>` vers `https://api.moviez.ac/<id>` (film) ou
   `https://api.moviez.ac/serie/<id>/<saison>/<épisode>` (série), avec choix saison / épisode / langue.
-- **Recherche** par titre (insensible aux accents) et **filtres** films / séries / animes + langue (VF, VOSTFR, VO, MULTI).
+- **Comptes locaux gratuits** : création de profil, connexion, mot de passe étiré en PBKDF2-SHA256 (150 000 tours).
+  Aucun serveur, aucune inscription externe, rien ne quitte le navigateur.
+- **Historique et watch list par profil**, classés par films, séries et animes, avec saison/épisode vus et date
+  relative. Historique limité aux 300 derniers titres, exportable en JSON.
+- **Recherche** par titre (insensible aux accents) et **filtres** films / séries / animes, avec pagination par 60.
 - **Recherche directe par id TMDB** : l'API Moviez est adressée par id, donc coller un id ouvre la fiche et le lecteur.
-- **Liens partageables** : `#/t/1399` ouvre directement le lecteur sur un titre.
+- **Liens partageables** : `#/t/1399` ouvre directement le lecteur, `#/compte` la page du profil.
+
+Les langues disponibles ne sont pas stockées dans le catalogue : elles sont demandées à `/api/check` à l'ouverture du
+lecteur, ce qui reste exact titre par titre (VF, VO, VOSTFR, MULTI).
 
 ## API
 
@@ -21,20 +29,42 @@ Aucune clé n'est nécessaire : `api.moviez.ac` est ouvert (`Access-Control-Allo
 | Endpoint | Rôle |
 | --- | --- |
 | `GET /api/check/<tmdb>` | disponibilité, type (film/série), langues, affiche, titre, année, saisons |
+| `GET /api/browse?kind=movie\|tv&limit=120&offset=N` | catalogue paginé (limit plafonne à 120) |
+| `GET /api/stats` | volumétrie du catalogue |
 | `GET /<tmdb>` | lecteur d'un film |
 | `GET /serie/<tmdb>/<saison>/<épisode>` | lecteur d'un épisode |
 
 Paramètres de lecture : `?autoplay=1`, `?lang=vf|vo|vostfr|multi` (défaut `vf`).
 
-Le catalogue est généré à partir de l'API elle-même — les titres, affiches et langues ne sont jamais saisis à la main :
+## Construire le catalogue
+
+Rien n'est saisi à la main : les titres, affiches et années viennent des réponses de l'API, et les ids TMDB de Wikidata
+servent seulement à classer les animes et à remonter les titres connus.
 
 ```bash
-node scripts/verify-ids.mjs candidates.json verify-results.json   # sonde des ids TMDB
-node scripts/build-catalog.mjs                                    # écrit src/data/catalog.json
+node scripts/harvest.mjs 60        # ~7 200 films + ~7 200 séries via /api/browse
+node scripts/wikidata.mjs          # ids notables (films/séries) + animes
+node scripts/build-catalog.mjs     # fusionne et écrit src/data/catalog.json
 ```
 
-`scripts/build-catalog.mjs` ne garde que les ids explicitement retenus : certains ids TMDB de films et de séries se
-recouvrent numériquement, et l'API renvoie alors l'autre titre.
+`src/data/catalog.json` est un tableau compact `[tmdbId, titre, année, code, cheminAffiche]` avec `code` 0=film,
+1=série, 2=anime, trié par notoriété puis par année — les données brutes de collecte restent dans `.cache/` (non
+versionné).
+
+`scripts/verify-ids.mjs` reste disponible pour sonder une liste d'ids TMDB à la main (`/api/check`), utile quand un id
+de film et un id de série se recouvrent numériquement : l'API en renvoie un seul, et la curation tranche.
+
+## Comptes
+
+Il n'y a pas de backend : un compte est un profil du navigateur (`src/lib/accounts.ts`), l'historique et la watch list
+vivent dans `localStorage` sous `metalflix.library.<id>` (`src/lib/library.ts`).
+
+- Mot de passe : sel aléatoire de 16 octets + PBKDF2-SHA256, 150 000 itérations via WebCrypto ; seul le sel et
+  l'empreinte sont stockés.
+- Les entrées gardent un instantané du titre (affiche, année, type), donc les listes restent lisibles même pour un id
+  absent du catalogue.
+- Export JSON depuis la page compte. Conséquence assumée : les données ne suivent pas d'un appareil à l'autre, et vider
+  les données du navigateur les efface.
 
 ## Développement
 
@@ -47,9 +77,13 @@ npm run preview
 
 ## Design
 
-Habillage construit sur `argentui` (métal liquide, MIT) : `MetalText` pour le titre à la une, `MetalCard` pour les
-affiches, `MetalButton` / `MetalBadge` pour les contrôles. Le shader Paper (`@paper-design/shaders-react`) est une
-dépendance peer d'Argent, sous licence PolyForm Shield.
+Habillage construit sur `argentui` (métal liquide, MIT) : `MetalText` pour le titre à la une et le nom du profil,
+`MetalButton` / `MetalBadge` pour les contrôles, `MetalCard` pour les blocs de la page compte. Le shader Paper
+(`@paper-design/shaders-react`) est une dépendance peer d'Argent, sous licence PolyForm Shield.
+
+Les affiches n'utilisent volontairement **pas** de canvas WebGL : un contexte par vignette dépassait la limite du
+navigateur (~16) et cassait le shader des surfaces visibles. Elles reprennent le dégradé chrome d'Argent en CSS, la
+page restant à ~7 canvas.
 
 Le fond neutre et les surfaces sombres viennent des variables `--argent-panel`, `--argent-panel-text`,
 `--argent-halo-line` redéfinies dans `src/styles.css`.

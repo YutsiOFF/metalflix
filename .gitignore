@@ -6,3 +6,6 @@ scripts/verify-results*.json
 .env
 .env.*
 .DS_Store
+
+# Données de collecte (régénérables)
+.cache/
