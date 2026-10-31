@@ -11,9 +11,9 @@ interface HeroProps {
 const ROTATE_MS = 9000;
 
 /**
- * Several titles at a time, each with its own artwork behind the headline: one
- * still is a lot of empty black, and the shader headline made it worse by
- * drawing attention to the emptiness. Static type, moving pictures.
+ * One still per title, full width behind the headline. The still fades out
+ * towards the bottom so the hero melts into the page instead of ending on a
+ * hard edge — no poster on the side to compete with it.
  *
  * The dots sit in the middle of the hero and the active one fills over the same
  * interval as the rotation, so the change is expected instead of sudden.
@@ -89,10 +89,6 @@ export default function Hero({ items, onPlay }: HeroProps) {
             Fiche API
           </a>
         </div>
-      </div>
-
-      <div className="mf-hero__poster">
-        <img src={item.poster} alt={`Affiche de ${item.title}`} decoding="async" />
       </div>
 
       {count > 1 ? (
