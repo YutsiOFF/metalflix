@@ -10,6 +10,10 @@ interface HeroProps {
 
 const ROTATE_MS = 9000;
 
+/** The catalogue stores w500 posters; the hero stretches them across the page,
+ *  where 500 px turns to mush. TMDB serves the same file at w1280. */
+const stillSrc = (poster: string) => poster.replace("/w500/", "/w1280/");
+
 /**
  * One still per title, full width behind the headline. The still fades out
  * towards the bottom so the hero melts into the page instead of ending on a
@@ -55,7 +59,7 @@ export default function Hero({ items, onPlay }: HeroProps) {
           <img
             key={entry.id}
             className={`mf-hero__still${position === index ? " is-active" : ""}`}
-            src={entry.poster}
+            src={stillSrc(entry.poster)}
             alt=""
             decoding="async"
             loading={position === 0 ? "eager" : "lazy"}
