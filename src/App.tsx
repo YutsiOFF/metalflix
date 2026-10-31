@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MetalBadge, MetalButton, MetalCard } from "argentui";
+import { MetalButton, MetalCard } from "argentui";
 import { Clapperboard, Film, Search, Sparkles, Tv } from "lucide-react";
 import { CATALOG, CATEGORY_LABEL, countByCategory, dailyPicks, findTitle, searchTitles, type Category, type Title } from "./lib/catalog";
 import { LANG_LABEL } from "./lib/moviez";
@@ -121,9 +121,15 @@ export default function App() {
         </div>
 
         <nav className="mf-header__meta" aria-label="Catalogue">
-          <MetalBadge tone="silver">{countByCategory("film")} films</MetalBadge>
-          <MetalBadge tone="cobalt">{countByCategory("serie")} séries</MetalBadge>
-          <MetalBadge tone="amethyst">{countByCategory("anime")} animes</MetalBadge>
+          <span className="mf-stat">
+            <b>{countByCategory("film")}</b> films
+          </span>
+          <span className="mf-stat">
+            <b>{countByCategory("serie")}</b> séries
+          </span>
+          <span className="mf-stat">
+            <b>{countByCategory("anime")}</b> animes
+          </span>
         </nav>
       </header>
 

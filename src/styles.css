@@ -362,20 +362,44 @@ a:hover {
 
 /* ── Poster card ──────────────────────────────────────────────────────── */
 
-.mf-card.argent {
-  display: block;
-  padding: 0;
+/* The rim is Argent's CSS chrome gradient — the same finish its shader falls
+   back to, but free at any scale. One canvas per poster would exhaust WebGL. */
+.mf-card {
+  position: relative;
+  padding: 1.5px;
+  border-radius: 16px;
+  background: var(--mf-rim);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.45);
   cursor: pointer;
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  transition: transform 200ms ease, filter 200ms ease, box-shadow 200ms ease;
 }
 
-.mf-card .argent-content {
-  padding: 0;
+.mf-card--silver {
+  --mf-rim: linear-gradient(135deg, #ffffff 0%, #dfe3e8 15%, #a6acb5 35%, #34383e 50%, #b4bac2 64%, #eef1f4 82%, #ffffff 100%);
+}
+
+.mf-card--cobalt {
+  --mf-rim: linear-gradient(135deg, #eef4ff 0%, #a7c0f2 16%, #4a66b4 38%, #1b2a5e 52%, #5e7bce 66%, #bcd0f7 84%, #eef4ff 100%);
+}
+
+.mf-card--amethyst {
+  --mf-rim: linear-gradient(135deg, #f6eeff 0%, #c8a8f2 16%, #7a4ab8 38%, #3a1c6e 52%, #9466ce 66%, #d8bcf7 84%, #f6eeff 100%);
+}
+
+.mf-card__inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: 14.5px;
+  overflow: hidden;
+  background: #0d0e11;
 }
 
 .mf-card:hover,
 .mf-card:focus-visible {
   transform: translateY(-4px);
+  filter: brightness(1.05);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   outline: none;
 }
 
@@ -383,7 +407,6 @@ a:hover {
   position: relative;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: 13px 13px 0 0;
   background: linear-gradient(160deg, #1a1d23, #0c0e11);
 }
 
@@ -450,11 +473,46 @@ a:hover {
 
 .mf-card__badge {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 10px;
+  left: 10px;
+  padding: 2px 9px;
+  border-radius: 999px;
   font-size: 9px;
-  letter-spacing: 0.12em;
-  padding: 2px 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #08090b;
+  background: linear-gradient(135deg, #ffffff 0%, #dfe3e8 35%, #6f7681 58%, #eef1f4 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.mf-card__badge--cobalt {
+  background: linear-gradient(135deg, #eef4ff 0%, #a7c0f2 35%, #2c3f78 58%, #bcd0f7 100%);
+  color: #060c1f;
+}
+
+.mf-card__badge--amethyst {
+  background: linear-gradient(135deg, #f6eeff 0%, #c8a8f2 35%, #4b2a80 58%, #d8bcf7 100%);
+  color: #140826;
+}
+
+/* Header counters stay CSS-only: every Argent badge is a WebGL canvas. */
+.mf-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--mf-edge);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mf-muted);
+}
+
+.mf-stat b {
+  font-size: 12px;
+  color: #f2f3f5;
 }
 
 /* ── Direct id lookup ─────────────────────────────────────────────────── */
