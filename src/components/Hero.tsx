@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, Play, Sparkles } from "lucide-react";
 import type { Title } from "../lib/catalog";
 import { GENRE_LABEL } from "../lib/catalog";
+import { loadBackdrops } from "../lib/artwork";
 import { loadSynopses } from "../lib/synopsis";
 
 interface HeroProps {
@@ -11,18 +12,14 @@ interface HeroProps {
 
 const ROTATE_MS = 9000;
 
-/**
- * The catalogue stores w500 posters; stretched across the page they turn to
- * mush, so the hero asks TMDB for the untouched file and keeps the cheap one
- * for the stills that have not been shown yet — two big images at a time, not
- * six.
- */
+/** Moviez only stores w500 posters; the untouched file is the sharp one. */
 const fullSize = (poster: string) => poster.replace("/w500/", "/original/");
 
 /**
- * One still per title, full width behind the headline. The still fades out
- * towards the bottom so the hero melts into the page instead of ending on a
- * hard edge — no poster on the side to compete with it.
+ * One title at a time, full width behind the headline, with the film's real
+ * 16:9 backdrop when Moviez's viewer page exposes it — a portrait poster
+ * cropped into a banner cuts faces in half. The image fades out towards the
+ * bottom so the hero melts into the page instead of ending on a hard edge.
  *
  * The dots sit in the middle of the hero and the active one fills over the same
  * interval as the rotation, so the change is expected instead of sudden.
@@ -30,7 +27,7 @@ const fullSize = (poster: string) => poster.replace("/w500/", "/original/");
 export default function Hero({ items, onPlay }: HeroProps) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [promoted, setPromoted] = useState<number[]>([0, 1]);
+  const [backdrops, setBackdrops] = useState<Record<string, string>>({});
   const [synopses, setSynopses] = useState<Record<number, string>>({});
   const count = items.length;
 
@@ -44,20 +41,12 @@ export default function Hero({ items, onPlay }: HeroProps) {
     return () => window.clearInterval(timer);
   }, [paused, count]);
 
-  // Promote the current and the next still to the full-size file, and never
-  // demote: swapping the source of a picture that is fading out flashes.
-  useEffect(() => {
-    setPromoted((previous) => {
-      const wanted = [index, (index + 1) % count];
-      return wanted.every((position) => previous.includes(position))
-        ? previous
-        : [...new Set([...previous, ...wanted])];
-    });
-  }, [index, count]);
-
   useEffect(() => {
     if (!items.length) return;
     let alive = true;
+    loadBackdrops(items.map((entry) => entry.id)).then((map) => {
+      if (alive) setBackdrops(map);
+    });
     loadSynopses(items.map((entry) => ({ id: entry.id, series: entry.type === "series" }))).then((map) => {
       if (alive) setSynopses(map);
     });
@@ -89,10 +78,10 @@ export default function Hero({ items, onPlay }: HeroProps) {
           <img
             key={entry.id}
             className={`mf-hero__still${position === index ? " is-active" : ""}`}
-            src={promoted.includes(position) ? fullSize(entry.poster) : entry.poster}
+            src={backdrops[String(entry.id)] || fullSize(entry.poster)}
             alt=""
             decoding="async"
-            loading={position === 0 || position === 1 ? "eager" : "lazy"}
+            loading={position < 2 ? "eager" : "lazy"}
           />
         ))}
       </div>
