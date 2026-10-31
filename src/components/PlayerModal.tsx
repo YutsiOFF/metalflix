@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MetalBadge, MetalButton, MetalProgress } from "argentui";
-import { Bookmark, BookmarkCheck, ExternalLink, SkipForward, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, ExternalLink, SkipForward, X } from "lucide-react";
 import { LANG_LABEL, checkTitle, playerUrl, type MoviezLang } from "../lib/moviez";
 import type { Category } from "../lib/catalog";
 
@@ -19,13 +18,23 @@ interface PlayerModalProps {
   subject: PlaySubject;
   onClose: () => void;
   wanted?: boolean;
+  done?: boolean;
   onToggleWatch?: (subject: PlaySubject) => void;
+  onToggleDone?: () => void;
   onWatched?: (subject: PlaySubject, season: number, episode: number) => void;
 }
 
 const PLAYABLE: MoviezLang[] = ["vf", "vo", "vostfr", "multi"];
 
-export default function PlayerModal({ subject, onClose, wanted = false, onToggleWatch, onWatched }: PlayerModalProps) {
+export default function PlayerModal({
+  subject,
+  onClose,
+  wanted = false,
+  done = false,
+  onToggleWatch,
+  onToggleDone,
+  onWatched,
+}: PlayerModalProps) {
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
   const [lang, setLang] = useState<MoviezLang>("vf");
@@ -36,6 +45,9 @@ export default function PlayerModal({ subject, onClose, wanted = false, onToggle
   // dependency would re-record the same watch in a loop.
   const watchedRef = useRef(onWatched);
   watchedRef.current = onWatched;
+  // `subject` is a fresh object on every App render, so recording keyed off it
+  // fed setState → render → record → setState. The signature guard stops that.
+  const recordedRef = useRef("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -60,8 +72,11 @@ export default function PlayerModal({ subject, onClose, wanted = false, onToggle
 
   useEffect(() => {
     if (status !== "ready") return;
+    const signature = `${subject.id}:${season}:${episode}`;
+    if (recordedRef.current === signature) return;
+    recordedRef.current = signature;
     watchedRef.current?.(subject, season, episode);
-  }, [status, season, episode, subject]);
+  }, [status, season, episode, subject.id]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -106,27 +121,37 @@ export default function PlayerModal({ subject, onClose, wanted = false, onToggle
             <a className="mf-link mf-link--icon" href={src} target="_blank" rel="noreferrer noopener">
               <ExternalLink size={14} /> Nouvel onglet
             </a>
+            {onToggleDone ? (
+              <button
+                type="button"
+                className={`mf-btn mf-btn--sm${done ? " is-on" : ""}`}
+                aria-pressed={done}
+                onClick={onToggleDone}
+              >
+                <Check size={15} /> {done ? "Terminé" : "J'ai terminé"}
+              </button>
+            ) : null}
             {onToggleWatch ? (
-              <MetalButton
-                tone={wanted ? "gold" : "silver"}
-                size="sm"
-                radius={999}
-                icon={wanted ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+              <button
+                type="button"
+                className={`mf-btn mf-btn--sm${wanted ? " is-on" : ""}`}
+                aria-pressed={wanted}
                 onClick={() => onToggleWatch(subject)}
               >
+                {wanted ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
                 {wanted ? "Dans ma liste" : "Ma liste"}
-              </MetalButton>
+              </button>
             ) : null}
-            <MetalButton tone="gunmetal" size="sm" radius={999} onClick={onClose} icon={<X size={15} />}>
-              Fermer
-            </MetalButton>
+            <button type="button" className="mf-btn mf-btn--sm" onClick={onClose}>
+              <X size={15} /> Fermer
+            </button>
           </div>
         </header>
 
         <div className="mf-player">
           {status === "loading" && (
             <div className="mf-player__state">
-              <MetalProgress tone="silver" />
+              <div className="mf-loader" aria-hidden="true" />
               <p>Vérification de la disponibilité…</p>
             </div>
           )}
@@ -190,20 +215,15 @@ export default function PlayerModal({ subject, onClose, wanted = false, onToggle
             </select>
           </label>
           {subject.type === "series" && (
-            <MetalButton
-              tone="silver"
-              size="sm"
-              icon={<SkipForward size={15} />}
-              onClick={() => setEpisode((value) => value + 1)}
-            >
-              Épisode suivant
-            </MetalButton>
+            <button type="button" className="mf-btn mf-btn--sm" onClick={() => setEpisode((value) => value + 1)}>
+              <SkipForward size={15} /> Épisode suivant
+            </button>
           )}
           <div className="mf-modal__langs">
             {languages.map((value) => (
-              <MetalBadge key={value} tone={value === lang ? "gold" : "gunmetal"}>
+              <span key={value} className={`mf-chip${value === lang ? " is-active" : ""}`}>
                 {LANG_LABEL[value] ?? value.toUpperCase()}
-              </MetalBadge>
+              </span>
             ))}
           </div>
         </footer>

@@ -9,12 +9,17 @@ Site statique (Vite + React + TypeScript) publié sur GitHub Pages : **https://y
 
 - **Catalogue de 13 819 titres** (7 234 films, 5 379 séries, 1 206 animes), tous réellement servis par l'API Moviez,
   avec affiche et année. Le catalogue vit dans son propre chunk (~1 Mo) pour que l'interface s'affiche sans l'attendre.
+- **Filtres et tri** : catégorie, genre (18 genres, dont Horreur, Science-fiction, Western…), décennie et tri par année,
+  combinables avec la recherche.
+- **Carrousel à la une** : six titres qui tournent toutes les 9 s, chacun avec son affiche en fond et en vignette.
 - **Lecteur intégré** : `/api/check/<id>` puis `<iframe>` vers `https://api.moviez.ac/<id>` (film) ou
   `https://api.moviez.ac/serie/<id>/<saison>/<épisode>` (série), avec choix saison / épisode / langue.
 - **Comptes locaux gratuits** : création de profil, connexion, mot de passe étiré en PBKDF2-SHA256 (150 000 tours).
   Aucun serveur, aucune inscription externe, rien ne quitte le navigateur.
 - **Historique et watch list par profil**, classés par films, séries et animes, avec saison/épisode vus et date
-  relative. Historique limité aux 300 derniers titres, exportable en JSON.
+  relative. Chaque entrée est marquée **En cours** ou **Terminé** : le lecteur est une iframe tierce et ne peut pas
+  rapporter la position de lecture, donc le statut est explicite (bouton « J'ai terminé » dans le lecteur, ou ✓ dans
+  l'historique). Historique limité aux 300 derniers titres, exportable en JSON.
 - **Recherche** par titre (insensible aux accents) et **filtres** films / séries / animes, avec pagination par 60.
 - **Recherche directe par id TMDB** : l'API Moviez est adressée par id, donc coller un id ouvre la fiche et le lecteur.
 - **Liens partageables** : `#/t/1399` ouvre directement le lecteur, `#/compte` la page du profil.
@@ -44,12 +49,19 @@ servent seulement à classer les animes et à remonter les titres connus.
 ```bash
 node scripts/harvest.mjs 60        # ~7 200 films + ~7 200 séries via /api/browse
 node scripts/wikidata.mjs          # ids notables (films/séries) + animes
+node scripts/genres.mjs            # genres par id TMDB (masque de bits)
 node scripts/build-catalog.mjs     # fusionne et écrit src/data/catalog.json
 ```
 
-`src/data/catalog.json` est un tableau compact `[tmdbId, titre, année, code, cheminAffiche]` avec `code` 0=film,
-1=série, 2=anime, trié par notoriété puis par année — les données brutes de collecte restent dans `.cache/` (non
-versionné).
+`src/data/catalog.json` est un tableau compact `[tmdbId, titre, année, code, cheminAffiche, masqueGenres?]` avec
+`code` 0=film, 1=série, 2=anime, trié par notoriété puis par année — les données brutes de collecte restent dans
+`.cache/` (non versionné).
+
+Les genres ne viennent pas de Moviez (`/api/browse` ni `/api/check` ne les exposent) : `scripts/genres.mjs` les collecte
+sur Wikidata, une requête par genre pour les films et une requête groupée sur les libellés réellement utilisés pour les
+séries. 9 773 titres du catalogue sont étiquetés, en priorité les plus notables. Le masque est un entier : les 18 genres
+occupent chacun un bit, donc un titre coûte 2 à 4 octets de plus. Un genre ajouté doit être ajouté en fin de liste
+(l'ordre fixe l'indice du bit).
 
 `scripts/verify-ids.mjs` reste disponible pour sonder une liste d'ids TMDB à la main (`/api/check`), utile quand un id
 de film et un id de série se recouvrent numériquement : l'API en renvoie un seul, et la curation tranche.
@@ -82,8 +94,13 @@ Habillage construit sur `argentui` (métal liquide, MIT) : `MetalText` pour le t
 (`@paper-design/shaders-react`) est une dépendance peer d'Argent, sous licence PolyForm Shield.
 
 Les affiches n'utilisent volontairement **pas** de canvas WebGL : un contexte par vignette dépassait la limite du
-navigateur (~16) et cassait le shader des surfaces visibles. Elles reprennent le dégradé chrome d'Argent en CSS, la
-page restant à ~7 canvas.
+navigateur (~16) et cassait le shader des surfaces visibles. Le reste de l'interface est désormais statique lui aussi
+(compte, lecteur, filtres, boutons) : le métal liquide ne reste que sur le mot-symbole. Un shader qui bouge sous une
+liste qu'on lit fatigue plus qu'il n'habille.
+
+Les vignettes remplissent leur carte : la grille étire toutes les cartes d'une rangée à la hauteur de la plus grande, et
+le bloc interne ne suivait pas, laissant apparaître le liseré chromé en bas. Le liseré est passé à 1 px et le bloc
+interne occupe 100 % de la hauteur.
 
 Le fond neutre et les surfaces sombres viennent des variables `--argent-panel`, `--argent-panel-text`,
 `--argent-halo-line` redéfinies dans `src/styles.css`.

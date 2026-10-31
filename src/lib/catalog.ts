@@ -1,5 +1,68 @@
 export type Category = "film" | "serie" | "anime";
 
+export type GenreKey =
+  | "action"
+  | "adventure"
+  | "animation"
+  | "comedy"
+  | "crime"
+  | "documentary"
+  | "drama"
+  | "family"
+  | "fantasy"
+  | "history"
+  | "horror"
+  | "music"
+  | "mystery"
+  | "romance"
+  | "scifi"
+  | "thriller"
+  | "war"
+  | "western";
+
+/** Bit order must match scripts/genres.mjs. */
+export const GENRE_ORDER: GenreKey[] = [
+  "action",
+  "adventure",
+  "animation",
+  "comedy",
+  "crime",
+  "documentary",
+  "drama",
+  "family",
+  "fantasy",
+  "history",
+  "horror",
+  "music",
+  "mystery",
+  "romance",
+  "scifi",
+  "thriller",
+  "war",
+  "western",
+];
+
+export const GENRE_LABEL: Record<GenreKey, string> = {
+  action: "Action",
+  adventure: "Aventure",
+  animation: "Animation",
+  comedy: "Comédie",
+  crime: "Crime",
+  documentary: "Documentaire",
+  drama: "Drame",
+  family: "Familial",
+  fantasy: "Fantastique",
+  history: "Histoire",
+  horror: "Horreur",
+  music: "Musique",
+  mystery: "Mystère",
+  romance: "Romance",
+  scifi: "Science-fiction",
+  thriller: "Thriller",
+  war: "Guerre",
+  western: "Western",
+};
+
 export interface Title {
   id: number;
   title: string;
@@ -8,15 +71,21 @@ export interface Title {
   category: Category;
   anime: boolean;
   poster: string;
+  genres: GenreKey[];
 }
 
-/** Compact rows from the build: [tmdbId, title, year, code, posterPath]. */
-export type CatalogRow = [number, string, number, 0 | 1 | 2, string];
+/** Compact rows from the build: [tmdbId, title, year, code, posterPath, genreMask?]. */
+export type CatalogRow = [number, string, number, 0 | 1 | 2, string, number?];
 
 const POSTER_BASE = "https://image.tmdb.org/t/p/w500/";
 const CATEGORIES: Category[] = ["film", "serie", "anime"];
 
 let cached: Title[] | null = null;
+
+export function genresOf(mask: number): GenreKey[] {
+  if (!mask) return [];
+  return GENRE_ORDER.filter((_, index) => (mask & (1 << index)) !== 0);
+}
 
 /**
  * The 13k-title catalogue lives in its own chunk (~1 MB), so the shell paints
@@ -25,7 +94,7 @@ let cached: Title[] | null = null;
 export async function loadCatalog(): Promise<Title[]> {
   if (cached) return cached;
   const rows = (await import("../data/catalog.json")).default as CatalogRow[];
-  cached = rows.map(([id, title, year, code, path]) => {
+  cached = rows.map(([id, title, year, code, path, mask]) => {
     const category = CATEGORIES[code] ?? "film";
     return {
       id,
@@ -35,6 +104,7 @@ export async function loadCatalog(): Promise<Title[]> {
       type: category === "film" ? "movie" : "series",
       anime: category === "anime",
       poster: path ? `${POSTER_BASE}${path}` : "",
+      genres: genresOf(mask ?? 0),
     } satisfies Title;
   });
   return cached;
@@ -69,10 +139,23 @@ export function findTitle(list: Title[], id: number): Title | undefined {
   return list.find((item) => item.id === id);
 }
 
-/** A deterministic daily pick from the most recognisable titles. */
-export function dailyPick(list: Title[]): Title {
-  const pool = list.filter((t) => t.title.length <= 24 && t.year >= 1990).slice(0, 120);
-  return pool[Math.floor(Date.now() / 86_400_000) % Math.max(pool.length, 1)] ?? list[0];
+/** Decades present in the catalogue, newest first. */
+export function decadesOf(list: Title[]): number[] {
+  const decades = new Set<number>();
+  for (const item of list) if (item.year) decades.add(Math.floor(item.year / 10) * 10);
+  return [...decades].sort((a, b) => b - a);
+}
+
+/**
+ * The hero rotates through a handful of recognisable titles: the catalogue is
+ * sorted notability-first, so the head of the list is the right pool. The day
+ * number offsets the window, so the selection turns over daily.
+ */
+export function dailyPicks(list: Title[], count: number): Title[] {
+  const pool = list.filter((t) => t.poster && t.year >= 1975 && t.title.length <= 34).slice(0, 90);
+  if (!pool.length) return list.slice(0, count);
+  const start = Math.floor(Date.now() / 86_400_000) % pool.length;
+  return Array.from({ length: Math.min(count, pool.length) }, (_, i) => pool[(start + i * 3) % pool.length]);
 }
 
 export const PAGE_SIZE = 60;

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { MetalButton } from "argentui";
 import { LogIn, ShieldCheck, UserPlus, X } from "lucide-react";
 import { listProfiles, signIn, signUp, type Profile } from "../lib/accounts";
 
@@ -47,9 +46,9 @@ export default function AccountModal({ onClose, onAuthenticated }: AccountModalP
             <h2>{mode === "signup" ? "Créer un compte" : "Se connecter"}</h2>
             <p>Gratuit, sans serveur : votre profil et votre historique restent sur cet appareil.</p>
           </div>
-          <MetalButton tone="gunmetal" size="sm" radius={999} icon={<X size={15} />} onClick={onClose}>
-            Fermer
-          </MetalButton>
+          <button type="button" className="mf-btn mf-btn--sm" onClick={onClose}>
+            <X size={15} /> Fermer
+          </button>
         </header>
 
         <div className="mf-auth__tabs" role="tablist">
@@ -104,9 +103,9 @@ export default function AccountModal({ onClose, onAuthenticated }: AccountModalP
 
           {error ? <p className="mf-auth__error">{error}</p> : null}
 
-          <MetalButton tone="gold" size="lg" type="submit" disabled={busy} halo>
+          <button type="submit" className="mf-btn mf-btn--primary" disabled={busy}>
             {busy ? "Un instant…" : mode === "signup" ? "Créer mon compte" : "Entrer"}
-          </MetalButton>
+          </button>
         </form>
 
         {profiles.length > 0 ? (

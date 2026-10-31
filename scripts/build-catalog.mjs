@@ -60,6 +60,7 @@ const RENAME = { 11: "La Guerre des étoiles" };
 const notableFilms = new Set(await readJson("../.cache/wd-films.json", []));
 const notableSeries = new Set(await readJson("../.cache/wd-series.json", []));
 const animeIds = new Set(await readJson("../.cache/wd-anime.json", []));
+const genreMasks = (await readJson("../.cache/genres.json", { masks: {} })).masks ?? {};
 
 const movies = await readJson("../.cache/browse-movie.json", []);
 const shows = await readJson("../.cache/browse-tv.json", []);
@@ -104,7 +105,12 @@ for (const item of [...movies, ...shows]) {
 // Recognisable titles first, then newest; the bundle keeps no popularity field.
 rows.sort((a, b) => Number(b.notable) - Number(a.notable) || b.year - a.year || a.title.localeCompare(b.title, "fr"));
 
-const compact = rows.map((row) => [row.id, row.title, row.year, row.code, row.poster]);
+// The genre mask is appended only when it exists, so the untagged majority
+// stays as compact as before.
+const compact = rows.map((row) => {
+  const mask = genreMasks[row.id] ?? 0;
+  return mask ? [row.id, row.title, row.year, row.code, row.poster, mask] : [row.id, row.title, row.year, row.code, row.poster];
+});
 const json = JSON.stringify(compact);
 
 await mkdir(new URL("../src/data/", import.meta.url), { recursive: true });
@@ -115,4 +121,5 @@ const counts = rows.reduce(
   {},
 );
 console.log(`catalogue: ${rows.length} titres`, counts);
-console.log(`taille: ${(json.length / 1024).toFixed(0)} Kio · notables: ${rows.filter((r) => r.notable).length}`);
+const tagged = rows.filter((row) => genreMasks[row.id]).length;
+console.log(`taille: ${(json.length / 1024).toFixed(0)} Kio · notables: ${rows.filter((r) => r.notable).length} · genre: ${tagged}`);

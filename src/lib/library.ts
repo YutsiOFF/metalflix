@@ -19,6 +19,8 @@ export interface LibraryItem {
 export interface HistoryEntry extends LibraryItem {
   season?: number;
   episode?: number;
+  /** Explicitly marked as watched to the end — an iframe cannot tell us. */
+  done?: boolean;
 }
 
 export interface Library {
@@ -63,12 +65,25 @@ function write(profileId: string, library: Library): Library {
   return library;
 }
 
-/** Re-watching a title moves it to the top instead of duplicating it. */
+/**
+ * Re-watching a title moves it to the top instead of duplicating it, and keeps
+ * the "terminé" mark the viewer already gave it.
+ */
 export function recordWatch(profileId: string, entry: Omit<HistoryEntry, "at">, at = Date.now()): Library {
   const library = readLibrary(profileId);
+  const previous = library.history.find((item) => item.id === entry.id);
   const rest = library.history.filter((item) => item.id !== entry.id);
-  const history = [{ ...entry, at }, ...rest].slice(0, MAX_HISTORY);
+  const history = [{ ...entry, done: entry.done ?? previous?.done ?? false, at }, ...rest].slice(0, MAX_HISTORY);
   return write(profileId, { ...library, history });
+}
+
+/** The player cannot report playback progress, so "terminé" is an explicit act. */
+export function markDone(profileId: string, id: number, done: boolean): Library {
+  const library = readLibrary(profileId);
+  return write(profileId, {
+    ...library,
+    history: library.history.map((item) => (item.id === id ? { ...item, done } : item)),
+  });
 }
 
 export function clearHistory(profileId: string): Library {

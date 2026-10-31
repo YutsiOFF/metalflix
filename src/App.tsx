@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { MetalButton, MetalCard } from "argentui";
 import { Clapperboard, Film, LogIn, Search, Sparkles, Tv } from "lucide-react";
 import {
   CATEGORY_LABEL,
+  GENRE_LABEL,
+  GENRE_ORDER,
   PAGE_SIZE,
   countByCategory,
-  dailyPick,
+  dailyPicks,
+  decadesOf,
   findTitle,
   loadCatalog,
   searchTitles,
   type Category,
+  type GenreKey,
   type Title,
 } from "./lib/catalog";
 import { currentProfileId, listProfiles, signOut, type Profile } from "./lib/accounts";
 import {
   EMPTY_LIBRARY,
   clearHistory,
+  markDone,
   readLibrary,
   recordWatch,
   removeHistory,
@@ -32,9 +36,15 @@ import AccountModal from "./components/AccountModal";
 import AccountPage from "./components/AccountPage";
 
 type Filter = Category | "all";
+type Sort = "default" | "recent" | "oldest";
 type Route = { name: "home" } | { name: "account" } | { name: "title"; id: number };
 
 const FILTERS: Filter[] = ["all", "film", "serie", "anime"];
+const SORT_LABEL: Record<Sort, string> = {
+  default: "Pertinence",
+  recent: "Année ↓",
+  oldest: "Année ↑",
+};
 
 function parseHash(): Route {
   const hash = window.location.hash;
@@ -57,21 +67,12 @@ function subjectFor(catalog: Title[], id: number): PlaySubject | null {
   };
 }
 
-function useIsNarrow(): boolean {
-  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 760);
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 760px)");
-    const onChange = () => setNarrow(query.matches);
-    onChange();
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-  return narrow;
-}
-
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [filter, setFilter] = useState<Filter>("all");
+  const [genre, setGenre] = useState<GenreKey | "all">("all");
+  const [decade, setDecade] = useState<number | "all">("all");
+  const [sort, setSort] = useState<Sort>("default");
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [manual, setManual] = useState<PlaySubject | null>(null);
@@ -83,9 +84,9 @@ export default function App() {
   const [library, setLibrary] = useState<Library>(() => (profile ? readLibrary(profile.id) : EMPTY_LIBRARY));
   const [catalog, setCatalog] = useState<Title[]>([]);
   const [loading, setLoading] = useState(true);
-  const narrow = useIsNarrow();
 
-  const featured = useMemo(() => (catalog.length ? dailyPick(catalog) : null), [catalog]);
+  const featured = useMemo(() => (catalog.length ? dailyPicks(catalog, 6) : []), [catalog]);
+  const decades = useMemo(() => decadesOf(catalog), [catalog]);
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
@@ -105,21 +106,35 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => setVisible(PAGE_SIZE), [filter, query]);
+  useEffect(() => setVisible(PAGE_SIZE), [filter, genre, decade, sort, query]);
 
   const wantedIds = useMemo(() => new Set(library.watchlist.map((item) => item.id)), [library.watchlist]);
 
-  const results = useMemo(() => {
-    const list = filter === "all" ? catalog : catalog.filter((item) => item.category === filter);
-    return searchTitles(query, list);
-  }, [catalog, filter, query]);
+  const filtered = useMemo(
+    () =>
+      catalog.filter(
+        (item) =>
+          (filter === "all" || item.category === filter) &&
+          (genre === "all" || item.genres.includes(genre)) &&
+          (decade === "all" || (item.year ? Math.floor(item.year / 10) * 10 === decade : false)),
+      ),
+    [catalog, filter, genre, decade],
+  );
 
-  const searchMode = query.trim().length > 0 || filter !== "all";
+  const results = useMemo(() => {
+    const list = searchTitles(query, filtered);
+    if (sort === "recent") return [...list].sort((a, b) => b.year - a.year);
+    if (sort === "oldest") return [...list].sort((a, b) => a.year - b.year);
+    return list;
+  }, [filtered, query, sort]);
+
+  const searchMode = query.trim().length > 0 || filter !== "all" || genre !== "all" || decade !== "all" || sort !== "default";
   const numeric = /^\d+$/.test(query.trim());
   const numericHit = numeric ? findTitle(catalog, Number(query.trim())) : undefined;
 
   const routeSubject = route.name === "title" ? subjectFor(catalog, route.id) : null;
   const openSubject = manual ?? routeSubject;
+  const openDone = openSubject ? library.history.find((item) => item.id === openSubject.id)?.done ?? false : false;
 
   const rails = useMemo(
     () =>
@@ -163,6 +178,12 @@ export default function App() {
     );
   }
 
+  function toggleDone(id: number) {
+    if (!profile) return;
+    const current = library.history.find((item) => item.id === id)?.done ?? false;
+    setLibrary(markDone(profile.id, id, !current));
+  }
+
   function openLibraryItem(item: LibraryItem) {
     const title = findTitle(catalog, item.id);
     if (title) {
@@ -200,6 +221,14 @@ export default function App() {
     link.download = `metalflix-${(profile?.name ?? "profil").toLowerCase().replace(/\s+/g, "-")}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function resetFilters() {
+    setFilter("all");
+    setGenre("all");
+    setDecade("all");
+    setSort("default");
+    setQuery("");
   }
 
   return (
@@ -257,32 +286,74 @@ export default function App() {
             library={library}
             onOpenTitle={openLibraryItem}
             onToggleWatch={(item) => toggleWatch(item)}
+            onToggleDone={toggleDone}
             onRemoveHistory={(id) => profile && setLibrary(removeHistory(profile.id, id))}
             onClearHistory={() => profile && setLibrary(clearHistory(profile.id))}
             onExport={exportLibrary}
             onSignOut={handleSignOut}
             onConnect={() => setAuthOpen(true)}
           />
-        ) : (          <>
-            {featured ? <Hero item={featured} onPlay={openTitle} titleSize={narrow ? 52 : 92} /> : null}
+        ) : (
+          <>
+            <Hero items={featured} onPlay={openTitle} />
 
             <section className="mf-toolbar" aria-label="Filtres">
               <div className="mf-seg" role="tablist" aria-label="Catégories">
                 {FILTERS.map((value) => (
-                  <MetalButton
+                  <button
                     key={value}
+                    type="button"
                     role="tab"
                     aria-selected={filter === value}
-                    tone={filter === value ? "gold" : "gunmetal"}
-                    variant={filter === value ? "fill" : "border"}
-                    size="sm"
-                    radius={999}
+                    className={`mf-seg__btn${filter === value ? " is-active" : ""}`}
                     onClick={() => setFilter(value)}
                   >
                     {CATEGORY_LABEL[value]}
-                  </MetalButton>
+                  </button>
                 ))}
               </div>
+
+              <div className="mf-filters">
+                <label className="mf-select">
+                  <span>Genre</span>
+                  <select value={genre} onChange={(event) => setGenre(event.target.value as GenreKey | "all")}>
+                    <option value="all">Tous</option>
+                    {GENRE_ORDER.map((key) => (
+                      <option key={key} value={key}>
+                        {GENRE_LABEL[key]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="mf-select">
+                  <span>Année</span>
+                  <select
+                    value={String(decade)}
+                    onChange={(event) => setDecade(event.target.value === "all" ? "all" : Number(event.target.value))}
+                  >
+                    <option value="all">Toutes</option>
+                    {decades.map((value) => (
+                      <option key={value} value={value}>
+                        {value}s
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="mf-select">
+                  <span>Tri</span>
+                  <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
+                    {(Object.keys(SORT_LABEL) as Sort[]).map((value) => (
+                      <option key={value} value={value}>
+                        {SORT_LABEL[value]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" className="mf-btn mf-btn--sm" onClick={resetFilters}>
+                  Réinitialiser
+                </button>
+              </div>
+
               <p className="mf-count">
                 {results.length.toLocaleString("fr-FR")} titre{results.length > 1 ? "s" : ""}
               </p>
@@ -295,10 +366,12 @@ export default function App() {
             ) : null}
 
             {results.length === 0 && !numeric ? (
-              <MetalCard tone="gunmetal" radius={18} className="mf-empty">
-                <h3>Aucun titre ne correspond</h3>
-                <p>Essayez un autre mot-clé, ou collez un id TMDB pour ouvrir le lecteur directement.</p>
-              </MetalCard>
+              <section className="mf-section">
+                <div className="mf-panel mf-empty">
+                  <h3>Aucun titre ne correspond</h3>
+                  <p>Essayez un autre mot-clé, un autre genre, ou collez un id TMDB pour ouvrir le lecteur directement.</p>
+                </div>
+              </section>
             ) : null}
 
             {searchMode ? (
@@ -321,14 +394,13 @@ export default function App() {
                   </div>
                   {visible < results.length ? (
                     <div className="mf-loadmore">
-                      <MetalButton
-                        tone="silver"
-                        size="md"
-                        radius={999}
+                      <button
+                        type="button"
+                        className="mf-btn"
                         onClick={() => setVisible((value) => value + PAGE_SIZE * 2)}
                       >
                         Charger {Math.min(PAGE_SIZE * 2, results.length - visible)} titres de plus
-                      </MetalButton>
+                      </button>
                     </div>
                   ) : null}
                 </section>
@@ -378,8 +450,8 @@ export default function App() {
             titres réellement servis par l'API, affiches TMDB. Aucune clé requise : <code>/api/check/&lt;id&gt;</code> suffit.
           </p>
           <p>
-            Habillage <a href="https://github.com/seangeng/argent">Argent</a> (métal liquide, MIT). Comptes, historique et
-            watch list sont stockés dans ce navigateur — site statique servi par GitHub Pages.
+            Comptes, historique et watch list sont stockés dans ce navigateur — site statique servi par GitHub Pages.
+            Genres issus de Wikidata.
           </p>
         </footer>
       </main>
@@ -389,6 +461,8 @@ export default function App() {
           subject={openSubject}
           onClose={closePlayer}
           wanted={wantedIds.has(openSubject.id)}
+          done={openDone}
+          onToggleDone={() => toggleDone(openSubject.id)}
           onToggleWatch={(subject) =>
             toggleWatch({
               id: subject.id,
@@ -407,4 +481,3 @@ export default function App() {
     </div>
   );
 }
-
