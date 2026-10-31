@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MetalBadge, MetalButton, MetalProgress } from "argentui";
-import { ExternalLink, SkipForward, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, ExternalLink, SkipForward, X } from "lucide-react";
 import { LANG_LABEL, checkTitle, playerUrl, type MoviezLang } from "../lib/moviez";
+import type { Category } from "../lib/catalog";
 
 export interface PlaySubject {
   id: number;
   type: "movie" | "series";
   title: string;
+  poster?: string;
+  year?: number | null;
+  category?: Category;
   seasons?: number | null;
   languages?: string[];
 }
@@ -14,16 +18,24 @@ export interface PlaySubject {
 interface PlayerModalProps {
   subject: PlaySubject;
   onClose: () => void;
+  wanted?: boolean;
+  onToggleWatch?: (subject: PlaySubject) => void;
+  onWatched?: (subject: PlaySubject, season: number, episode: number) => void;
 }
 
 const PLAYABLE: MoviezLang[] = ["vf", "vo", "vostfr", "multi"];
 
-export default function PlayerModal({ subject, onClose }: PlayerModalProps) {
+export default function PlayerModal({ subject, onClose, wanted = false, onToggleWatch, onWatched }: PlayerModalProps) {
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
   const [lang, setLang] = useState<MoviezLang>("vf");
-  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "unavailable" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
   const [live, setLive] = useState<{ seasons?: number; languages?: string[] }>({});
+
+  // Keep the callback in a ref: App re-creates it on each render, and a new
+  // dependency would re-record the same watch in a loop.
+  const watchedRef = useRef(onWatched);
+  watchedRef.current = onWatched;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,6 +59,11 @@ export default function PlayerModal({ subject, onClose }: PlayerModalProps) {
   }, [subject.id]);
 
   useEffect(() => {
+    if (status !== "ready") return;
+    watchedRef.current?.(subject, season, episode);
+  }, [status, season, episode, subject]);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
@@ -68,7 +85,6 @@ export default function PlayerModal({ subject, onClose }: PlayerModalProps) {
 
   const seasonCount = live.seasons ?? subject.seasons ?? 1;
   const seasons = Math.max(1, Math.min(seasonCount || 1, 60));
-
   const src = playerUrl({ id: subject.id, type: subject.type, lang, season, episode });
 
   return (
@@ -90,6 +106,17 @@ export default function PlayerModal({ subject, onClose }: PlayerModalProps) {
             <a className="mf-link mf-link--icon" href={src} target="_blank" rel="noreferrer noopener">
               <ExternalLink size={14} /> Nouvel onglet
             </a>
+            {onToggleWatch ? (
+              <MetalButton
+                tone={wanted ? "gold" : "silver"}
+                size="sm"
+                radius={999}
+                icon={wanted ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+                onClick={() => onToggleWatch(subject)}
+              >
+                {wanted ? "Dans ma liste" : "Ma liste"}
+              </MetalButton>
+            ) : null}
             <MetalButton tone="gunmetal" size="sm" radius={999} onClick={onClose} icon={<X size={15} />}>
               Fermer
             </MetalButton>

@@ -1,42 +1,60 @@
 import { useEffect, useMemo, useState } from "react";
 import { MetalButton, MetalCard } from "argentui";
-import { Clapperboard, Film, Search, Sparkles, Tv } from "lucide-react";
-import { CATALOG, CATEGORY_LABEL, countByCategory, dailyPicks, findTitle, searchTitles, type Category, type Title } from "./lib/catalog";
-import { LANG_LABEL } from "./lib/moviez";
+import { Clapperboard, Film, LogIn, Search, Sparkles, Tv } from "lucide-react";
+import {
+  CATEGORY_LABEL,
+  PAGE_SIZE,
+  countByCategory,
+  dailyPick,
+  findTitle,
+  loadCatalog,
+  searchTitles,
+  type Category,
+  type Title,
+} from "./lib/catalog";
+import { currentProfileId, listProfiles, signOut, type Profile } from "./lib/accounts";
+import {
+  EMPTY_LIBRARY,
+  clearHistory,
+  readLibrary,
+  recordWatch,
+  removeHistory,
+  snapshotOf,
+  toggleWatchlist,
+  type Library,
+  type LibraryItem,
+} from "./lib/library";
 import Hero from "./components/Hero";
 import PosterCard from "./components/PosterCard";
 import PlayerModal, { type PlaySubject } from "./components/PlayerModal";
 import DirectLookup from "./components/DirectLookup";
+import AccountModal from "./components/AccountModal";
+import AccountPage from "./components/AccountPage";
 
 type Filter = Category | "all";
-type LangFilter = "all" | "vf" | "vostfr" | "vo" | "multi";
+type Route = { name: "home" } | { name: "account" } | { name: "title"; id: number };
 
 const FILTERS: Filter[] = ["all", "film", "serie", "anime"];
-const LANGS: LangFilter[] = ["all", "vf", "vostfr", "vo", "multi"];
 
-function subjectOf(item: Title): PlaySubject {
-  return { id: item.id, type: item.type, title: item.title, seasons: item.seasons, languages: item.languages };
+function parseHash(): Route {
+  const hash = window.location.hash;
+  const match = /^#\/t\/(\d+)/.exec(hash);
+  if (match) return { name: "title", id: Number(match[1]) };
+  if (hash.startsWith("#/compte")) return { name: "account" };
+  return { name: "home" };
 }
 
-function useHashSubject(): PlaySubject | null {
-  const [subject, setSubject] = useState<PlaySubject | null>(null);
-
-  useEffect(() => {
-    const apply = () => {
-      const match = /^#\/t\/(\d+)/.exec(window.location.hash);
-      if (!match) {
-        setSubject(null);
-        return;
-      }
-      const item = findTitle(Number(match[1]));
-      if (item) setSubject(subjectOf(item));
-    };
-    apply();
-    window.addEventListener("hashchange", apply);
-    return () => window.removeEventListener("hashchange", apply);
-  }, []);
-
-  return subject;
+function subjectFor(catalog: Title[], id: number): PlaySubject | null {
+  const item = findTitle(catalog, id);
+  if (!item) return null;
+  return {
+    id: item.id,
+    type: item.type,
+    title: item.title,
+    poster: item.poster,
+    year: item.year,
+    category: item.category,
+  };
 }
 
 function useIsNarrow(): boolean {
@@ -52,47 +70,137 @@ function useIsNarrow(): boolean {
 }
 
 export default function App() {
+  const [route, setRoute] = useState<Route>(parseHash);
   const [filter, setFilter] = useState<Filter>("all");
-  const [lang, setLang] = useState<LangFilter>("all");
   const [query, setQuery] = useState("");
+  const [visible, setVisible] = useState(PAGE_SIZE);
   const [manual, setManual] = useState<PlaySubject | null>(null);
-  const routeSubject = useHashSubject();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(() => {
+    const id = currentProfileId();
+    return id ? listProfiles().find((p) => p.id === id) ?? null : null;
+  });
+  const [library, setLibrary] = useState<Library>(() => (profile ? readLibrary(profile.id) : EMPTY_LIBRARY));
+  const [catalog, setCatalog] = useState<Title[]>([]);
+  const [loading, setLoading] = useState(true);
   const narrow = useIsNarrow();
 
-  const featured = useMemo(() => dailyPicks(1)[0] ?? CATALOG[0], []);
-  const open = manual ?? routeSubject;
+  const featured = useMemo(() => (catalog.length ? dailyPick(catalog) : null), [catalog]);
 
-  const items = useMemo(() => {
-    let list = CATALOG;
-    if (filter !== "all") list = list.filter((item) => item.category === filter);
-    if (lang !== "all") list = list.filter((item) => item.languages.includes(lang));
+  useEffect(() => {
+    const onHash = () => setRoute(parseHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    loadCatalog().then((items) => {
+      if (!alive) return;
+      setCatalog(items);
+      setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => setVisible(PAGE_SIZE), [filter, query]);
+
+  const wantedIds = useMemo(() => new Set(library.watchlist.map((item) => item.id)), [library.watchlist]);
+
+  const results = useMemo(() => {
+    const list = filter === "all" ? catalog : catalog.filter((item) => item.category === filter);
     return searchTitles(query, list);
-  }, [filter, lang, query]);
+  }, [catalog, filter, query]);
+
+  const searchMode = query.trim().length > 0 || filter !== "all";
+  const numeric = /^\d+$/.test(query.trim());
+  const numericHit = numeric ? findTitle(catalog, Number(query.trim())) : undefined;
+
+  const routeSubject = route.name === "title" ? subjectFor(catalog, route.id) : null;
+  const openSubject = manual ?? routeSubject;
 
   const rails = useMemo(
     () =>
       (["film", "serie", "anime"] as Category[]).map((category) => ({
         category,
-        items: items.filter((item) => item.category === category).slice(0, 18),
+        items: catalog.filter((item) => item.category === category).slice(0, 18),
       })),
-    [items],
+    [catalog],
   );
 
-  const searchMode = query.trim().length > 0 || filter !== "all" || lang !== "all";
-  const numeric = /^\d+$/.test(query.trim());
-  const numericHit = numeric ? findTitle(Number(query.trim())) : undefined;
-
-  const play = (item: Title) => {
+  function openTitle(item: Title) {
     window.location.hash = `/t/${item.id}`;
-  };
+  }
 
-  const closePlayer = () => {
+  function closePlayer() {
     setManual(null);
-    if (window.location.hash.startsWith("#/t/")) {
-      history.pushState("", document.title, `${window.location.pathname}${window.location.search}`);
+    history.pushState("", document.title, `${window.location.pathname}${window.location.search}`);
+    setRoute(parseHash());
+  }
+
+  function toggleWatch(snapshot: Omit<LibraryItem, "at">) {
+    if (!profile) {
+      setAuthOpen(true);
+      return;
     }
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
-  };
+    setLibrary(toggleWatchlist(profile.id, snapshot));
+  }
+
+  function onWatched(subject: PlaySubject, season: number, episode: number) {
+    if (!profile) return;
+    setLibrary(
+      recordWatch(profile.id, {
+        id: subject.id,
+        title: subject.title,
+        poster: subject.poster ?? null,
+        year: subject.year ?? null,
+        type: subject.type,
+        category: subject.category ?? (subject.type === "movie" ? "film" : "serie"),
+        ...(subject.type === "series" ? { season, episode } : {}),
+      }),
+    );
+  }
+
+  function openLibraryItem(item: LibraryItem) {
+    const title = findTitle(catalog, item.id);
+    if (title) {
+      openTitle(title);
+      return;
+    }
+    setManual({
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      poster: item.poster ?? undefined,
+      year: item.year,
+      category: item.category,
+    });
+  }
+
+  function handleAuthenticated(next: Profile) {
+    setProfile(next);
+    setLibrary(readLibrary(next.id));
+    setAuthOpen(false);
+  }
+
+  function handleSignOut() {
+    signOut();
+    setProfile(null);
+    setLibrary(EMPTY_LIBRARY);
+  }
+
+  function exportLibrary() {
+    const payload = { profile: profile?.name, exportedAt: new Date().toISOString(), ...library };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `metalflix-${(profile?.name ?? "profil").toLowerCase().replace(/\s+/g, "-")}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="mf-shell">
@@ -110,7 +218,7 @@ export default function App() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Rechercher un film, une série, un id TMDB…"
+            placeholder={`Rechercher parmi ${catalog.length.toLocaleString("fr-FR")} titres…`}
             aria-label="Rechercher dans le catalogue"
           />
           {query ? (
@@ -120,121 +228,183 @@ export default function App() {
           ) : null}
         </div>
 
-        <nav className="mf-header__meta" aria-label="Catalogue">
-          <span className="mf-stat">
-            <b>{countByCategory("film")}</b> films
-          </span>
-          <span className="mf-stat">
-            <b>{countByCategory("serie")}</b> séries
-          </span>
-          <span className="mf-stat">
-            <b>{countByCategory("anime")}</b> animes
-          </span>
-        </nav>
+        <button
+          type="button"
+          className="mf-account-btn"
+          onClick={() => (profile ? (window.location.hash = "/compte") : setAuthOpen(true))}
+        >
+          {profile ? (
+            <>
+              <span className="mf-account-btn__avatar">{profile.name.slice(0, 1).toUpperCase()}</span>
+              {profile.name}
+            </>
+          ) : (
+            <>
+              <LogIn size={15} /> Compte
+            </>
+          )}
+        </button>
       </header>
 
       <main>
-        <Hero item={featured} onPlay={play} titleSize={narrow ? 52 : 92} />
-
-        <section className="mf-toolbar" aria-label="Filtres">
-          <div className="mf-seg" role="tablist" aria-label="Catégories">
-            {FILTERS.map((value) => (
-              <MetalButton
-                key={value}
-                role="tab"
-                aria-selected={filter === value}
-                tone={filter === value ? "gold" : "gunmetal"}
-                variant={filter === value ? "fill" : "border"}
-                size="sm"
-                radius={999}
-                onClick={() => setFilter(value)}
-              >
-                {CATEGORY_LABEL[value]}
-              </MetalButton>
-            ))}
-          </div>
-
-          <div className="mf-seg mf-seg--langs" role="group" aria-label="Langues disponibles">
-            {LANGS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`mf-chip mf-chip--button${lang === value ? " is-active" : ""}`}
-                onClick={() => setLang(value)}
-              >
-                {value === "all" ? "Toutes langues" : LANG_LABEL[value]}
-              </button>
-            ))}
-          </div>
-
-          <p className="mf-count">
-            {items.length} titre{items.length > 1 ? "s" : ""}
-            {lang !== "all" ? ` en ${LANG_LABEL[lang]}` : ""}
-          </p>
-        </section>
-
-        {numeric && !numericHit ? (
-          <section className="mf-section">
-            <DirectLookup id={Number(query.trim())} onPlay={(subject) => setManual(subject)} />
+        {loading ? (
+          <section className="mf-loading" aria-live="polite">
+            <p>Chargement du catalogue…</p>
           </section>
-        ) : null}
+        ) : route.name === "account" ? (
+          <AccountPage
+            profile={profile}
+            library={library}
+            onOpenTitle={openLibraryItem}
+            onToggleWatch={(item) => toggleWatch(item)}
+            onRemoveHistory={(id) => profile && setLibrary(removeHistory(profile.id, id))}
+            onClearHistory={() => profile && setLibrary(clearHistory(profile.id))}
+            onExport={exportLibrary}
+            onSignOut={handleSignOut}
+            onConnect={() => setAuthOpen(true)}
+          />
+        ) : (          <>
+            {featured ? <Hero item={featured} onPlay={openTitle} titleSize={narrow ? 52 : 92} /> : null}
 
-        {items.length === 0 && !numeric ? (
-          <MetalCard tone="gunmetal" radius={18} className="mf-empty">
-            <h3>Aucun titre ne correspond</h3>
-            <p>Essayez un autre mot-clé, ou collez un id TMDB pour ouvrir le lecteur directement.</p>
-          </MetalCard>
-        ) : null}
+            <section className="mf-toolbar" aria-label="Filtres">
+              <div className="mf-seg" role="tablist" aria-label="Catégories">
+                {FILTERS.map((value) => (
+                  <MetalButton
+                    key={value}
+                    role="tab"
+                    aria-selected={filter === value}
+                    tone={filter === value ? "gold" : "gunmetal"}
+                    variant={filter === value ? "fill" : "border"}
+                    size="sm"
+                    radius={999}
+                    onClick={() => setFilter(value)}
+                  >
+                    {CATEGORY_LABEL[value]}
+                  </MetalButton>
+                ))}
+              </div>
+              <p className="mf-count">
+                {results.length.toLocaleString("fr-FR")} titre{results.length > 1 ? "s" : ""}
+              </p>
+            </section>
 
-        {searchMode
-          ? items.length > 0 && (
-              <section className="mf-section" aria-label="Résultats">
-                <div className="mf-section__head">
-                  <h2>{query.trim() ? "Résultats" : CATEGORY_LABEL[filter]}</h2>
-                  <span>{items.length}</span>
-                </div>
-                <div className="mf-grid">
-                  {items.map((item) => (
-                    <PosterCard key={item.id} item={item} onOpen={play} />
-                  ))}
-                </div>
+            {numeric && !numericHit ? (
+              <section className="mf-section">
+                <DirectLookup id={Number(query.trim())} onPlay={(subject) => setManual(subject)} />
               </section>
-            )
-          : rails.map(
-              (rail) =>
-                rail.items.length > 0 && (
-                  <section className="mf-section" key={rail.category} aria-label={CATEGORY_LABEL[rail.category]}>
-                    <div className="mf-section__head">
-                      <h2>
-                        {rail.category === "film" ? <Film size={16} /> : rail.category === "serie" ? <Tv size={16} /> : <Sparkles size={16} />}
-                        {CATEGORY_LABEL[rail.category]}
-                      </h2>
-                      <button type="button" className="mf-more" onClick={() => setFilter(rail.category)}>
-                        Tout voir →
-                      </button>
+            ) : null}
+
+            {results.length === 0 && !numeric ? (
+              <MetalCard tone="gunmetal" radius={18} className="mf-empty">
+                <h3>Aucun titre ne correspond</h3>
+                <p>Essayez un autre mot-clé, ou collez un id TMDB pour ouvrir le lecteur directement.</p>
+              </MetalCard>
+            ) : null}
+
+            {searchMode ? (
+              results.length > 0 && (
+                <section className="mf-section" aria-label="Résultats">
+                  <div className="mf-section__head">
+                    <h2>{query.trim() ? "Résultats" : CATEGORY_LABEL[filter]}</h2>
+                    <span>{results.length}</span>
+                  </div>
+                  <div className="mf-grid">
+                    {results.slice(0, visible).map((item) => (
+                      <PosterCard
+                        key={item.id}
+                        item={item}
+                        onOpen={openTitle}
+                        wanted={wantedIds.has(item.id)}
+                        onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
+                      />
+                    ))}
+                  </div>
+                  {visible < results.length ? (
+                    <div className="mf-loadmore">
+                      <MetalButton
+                        tone="silver"
+                        size="md"
+                        radius={999}
+                        onClick={() => setVisible((value) => value + PAGE_SIZE * 2)}
+                      >
+                        Charger {Math.min(PAGE_SIZE * 2, results.length - visible)} titres de plus
+                      </MetalButton>
                     </div>
-                    <div className="mf-rail">
-                      {rail.items.map((item) => (
-                        <PosterCard key={item.id} item={item} onOpen={play} />
-                      ))}
-                    </div>
-                  </section>
-                ),
+                  ) : null}
+                </section>
+              )
+            ) : (
+              rails.map(
+                (rail) =>
+                  rail.items.length > 0 && (
+                    <section className="mf-section" key={rail.category} aria-label={CATEGORY_LABEL[rail.category]}>
+                      <div className="mf-section__head">
+                        <h2>
+                          {rail.category === "film" ? (
+                            <Film size={16} />
+                          ) : rail.category === "serie" ? (
+                            <Tv size={16} />
+                          ) : (
+                            <Sparkles size={16} />
+                          )}
+                          {CATEGORY_LABEL[rail.category]}
+                          <span className="mf-section__total">{countByCategory(catalog, rail.category)}</span>
+                        </h2>
+                        <button type="button" className="mf-more" onClick={() => setFilter(rail.category)}>
+                          Tout voir →
+                        </button>
+                      </div>
+                      <div className="mf-rail">
+                        {rail.items.map((item) => (
+                          <PosterCard
+                            key={item.id}
+                            item={item}
+                            onOpen={openTitle}
+                            wanted={wantedIds.has(item.id)}
+                            onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ),
+              )
             )}
+          </>
+        )}
 
         <footer className="mf-footer">
           <p>
-            Catalogue et lecteur : <a href="https://api.moviez.ac/">Moviez API</a> — affiches et métadonnées TMDB. Aucune
-            clé requise : <code>/api/check/&lt;id&gt;</code> suffit.
+            Catalogue et lecteur : <a href="https://api.moviez.ac/">Moviez API</a> — {catalog.length.toLocaleString("fr-FR")}{" "}
+            titres réellement servis par l'API, affiches TMDB. Aucune clé requise : <code>/api/check/&lt;id&gt;</code> suffit.
           </p>
           <p>
-            Habillage <a href="https://github.com/seangeng/argent">Argent</a> (métal liquide, MIT). Site statique servi par
-            GitHub Pages.
+            Habillage <a href="https://github.com/seangeng/argent">Argent</a> (métal liquide, MIT). Comptes, historique et
+            watch list sont stockés dans ce navigateur — site statique servi par GitHub Pages.
           </p>
         </footer>
       </main>
 
-      {open ? <PlayerModal subject={open} onClose={closePlayer} /> : null}
+      {openSubject ? (
+        <PlayerModal
+          subject={openSubject}
+          onClose={closePlayer}
+          wanted={wantedIds.has(openSubject.id)}
+          onToggleWatch={(subject) =>
+            toggleWatch({
+              id: subject.id,
+              title: subject.title,
+              poster: subject.poster ?? null,
+              year: subject.year ?? null,
+              type: subject.type,
+              category: subject.category ?? (subject.type === "movie" ? "film" : "serie"),
+            })
+          }
+          onWatched={onWatched}
+        />
+      ) : null}
+
+      {authOpen ? <AccountModal onClose={() => setAuthOpen(false)} onAuthenticated={handleAuthenticated} /> : null}
     </div>
   );
 }
+

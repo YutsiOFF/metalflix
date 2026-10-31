@@ -1,27 +1,36 @@
-// Builds src/data/catalog.json from the live Moviez /api/check responses.
+// Builds src/data/catalog.json from what the Moviez API actually serves.
 //
-// The Moviez API has no search/list endpoint: it is addressed by TMDB id. So the
-// catalogue is a curated set of ids, and every title/poster/year comes from the
-// API itself (never hand-written), which keeps the site honest if a title moves.
+// Two sources, merged:
+//  1. the curated picks verified earlier (they carry hand-checked types, and
+//     some TMDB movie/TV ids collide so those must stay explicit);
+//  2. the bulk harvest of /api/browse (.cache/browse-*.json).
 //
-// Run: node scripts/build-catalog.mjs
+// Rows are emitted as compact tuples to keep the bundle small:
+//   [tmdbId, title, year, code, posterPath]  with code 0=film 1=série 2=anime
+//
+// Run: node scripts/wikidata.mjs && node scripts/harvest.mjs && node scripts/build-catalog.mjs
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 
+async function readJson(path, fallback) {
+  try {
+    return JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+
 const verified = [
-  ...JSON.parse(await readFile(new URL("./verify-results.json", import.meta.url), "utf8")),
-  ...JSON.parse(await readFile(new URL("./verify-results2.json", import.meta.url), "utf8")),
+  ...(await readJson("./verify-results.json", [])),
+  ...(await readJson("./verify-results2.json", [])),
 ];
 
 const byId = new Map();
 for (const item of verified) {
   if (!item.available || !item.title || !item.poster) continue;
-  // Keep the first hit per id (batch 1 wins over batch 2).
   if (!byId.has(item.id)) byId.set(item.id, item);
 }
 
-// Curated category per id. Anything not listed here is left out on purpose:
-// some ids resolve to a different film than intended (TMDB movie/TV id spaces
-// collide), so the catalogue is an explicit pick, not "everything that answered".
+// Curated picks. Anything not listed is left to the harvest.
 const PICKS = {
   film: [
     11, 12, 13, 24, 98, 120, 121, 122, 129, 155, 238, 278, 329, 393, 550, 557, 559, 585, 603, 604,
@@ -46,50 +55,64 @@ const PICKS = {
   ],
 };
 
-// Titles that read badly out of context in French UI.
-const RENAME = {
-  11: "La Guerre des étoiles",
-  4689: "Sympathy for Mister Vengeance",
-};
+const RENAME = { 11: "La Guerre des étoiles" };
 
-const LANGS = ["vf", "vo", "vostfr", "multi"];
+const notableFilms = new Set(await readJson("../.cache/wd-films.json", []));
+const notableSeries = new Set(await readJson("../.cache/wd-series.json", []));
+const animeIds = new Set(await readJson("../.cache/wd-anime.json", []));
 
-const catalog = [];
+const movies = await readJson("../.cache/browse-movie.json", []);
+const shows = await readJson("../.cache/browse-tv.json", []);
+
+const posterPath = (url) => String(url).replace(/^https?:\/\/image\.tmdb\.org\/t\/p\/w\d+\//, "");
+
+const seen = new Set();
+const rows = [];
+
 for (const [category, ids] of Object.entries(PICKS)) {
+  const code = category === "film" ? 0 : category === "serie" ? 1 : 2;
   for (const id of ids) {
     const hit = byId.get(id);
-    if (!hit) {
-      console.warn(`! ${category}: id ${id} introuvable dans les résultats vérifiés`);
-      continue;
-    }
-    const languages = (hit.languages || [])
-      .map((l) => String(l).toLowerCase())
-      .filter((l) => LANGS.includes(l))
-      .sort((a, b) => LANGS.indexOf(a) - LANGS.indexOf(b));
-
-    catalog.push({
-      id: hit.id,
-      title: RENAME[hit.id] ?? hit.title,
-      year: hit.year ?? null,
-      type: hit.detectedType,
-      category,
-      // The animated catalogue section decides the badge, not the API's optional flag.
-      anime: category === "anime",
-      seasons: hit.detectedType === "series" ? hit.seasons ?? null : null,
-      languages: languages.length ? languages : ["vf"],
-      poster: hit.poster,
+    if (!hit || seen.has(id)) continue;
+    seen.add(id);
+    rows.push({
+      id,
+      title: RENAME[id] ?? hit.title,
+      year: hit.year ?? 0,
+      code,
+      poster: posterPath(hit.poster),
+      notable: true,
     });
   }
 }
 
-// De-duplicate (an id picked twice) and sort newest first inside each category.
-const seen = new Set();
-const clean = catalog
-  .filter((item) => (seen.has(item.id) ? false : seen.add(item.id)))
-  .sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title, "fr"));
+for (const item of [...movies, ...shows]) {
+  const id = Number(item.source_id);
+  if (!id || seen.has(id) || !item.poster || !item.year || !item.title) continue;
+  seen.add(id);
+  const isTv = item.kind === "tv";
+  rows.push({
+    id,
+    title: item.title,
+    year: item.year,
+    code: isTv ? (animeIds.has(id) ? 2 : 1) : 0,
+    poster: posterPath(item.poster),
+    notable: isTv ? notableSeries.has(id) : notableFilms.has(id),
+  });
+}
+
+// Recognisable titles first, then newest; the bundle keeps no popularity field.
+rows.sort((a, b) => Number(b.notable) - Number(a.notable) || b.year - a.year || a.title.localeCompare(b.title, "fr"));
+
+const compact = rows.map((row) => [row.id, row.title, row.year, row.code, row.poster]);
+const json = JSON.stringify(compact);
 
 await mkdir(new URL("../src/data/", import.meta.url), { recursive: true });
-await writeFile(new URL("../src/data/catalog.json", import.meta.url), JSON.stringify(clean, null, 2) + "\n");
+await writeFile(new URL("../src/data/catalog.json", import.meta.url), json + "\n");
 
-const counts = clean.reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] ?? 0) + 1 }), {});
-console.log(`catalogue: ${clean.length} titres`, counts);
+const counts = rows.reduce(
+  (acc, row) => ({ ...acc, [["film", "serie", "anime"][row.code]]: (acc[["film", "serie", "anime"][row.code]] ?? 0) + 1 }),
+  {},
+);
+console.log(`catalogue: ${rows.length} titres`, counts);
+console.log(`taille: ${(json.length / 1024).toFixed(0)} Kio · notables: ${rows.filter((r) => r.notable).length}`);
