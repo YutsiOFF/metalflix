@@ -1347,7 +1347,7 @@ a:hover {
   isolation: isolate;
   display: flex;
   align-items: flex-end;
-  min-height: clamp(400px, 46vw, 580px);
+  min-height: clamp(430px, 50vw, 620px);
   padding: clamp(44px, 6vw, 78px) clamp(16px, 4vw, 54px) clamp(74px, 7vw, 96px);
 }
 
@@ -1363,7 +1363,7 @@ a:hover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 26%;
+  object-position: center 22%;
   opacity: 0;
   transition: opacity 800ms ease;
 }
@@ -1407,6 +1407,21 @@ a:hover {
   font-size: 12px;
   color: var(--mf-muted);
   letter-spacing: 0.04em;
+}
+
+/* Four lines at most: the synopsis is a hook, and a long one would push the
+   buttons under the carousel nav on a phone. */
+.mf-hero__synopsis {
+  margin: 0;
+  max-width: 62ch;
+  font-size: clamp(13px, 1.05vw, 14.5px);
+  line-height: 1.62;
+  color: rgba(240, 242, 246, 0.86);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.75);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .mf-hero__nav {

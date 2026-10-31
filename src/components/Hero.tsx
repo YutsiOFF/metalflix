@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, Play, Sparkles } from "lucide-react";
 import type { Title } from "../lib/catalog";
 import { GENRE_LABEL } from "../lib/catalog";
+import { loadSynopses } from "../lib/synopsis";
 
 interface HeroProps {
   items: Title[];
@@ -10,9 +11,13 @@ interface HeroProps {
 
 const ROTATE_MS = 9000;
 
-/** The catalogue stores w500 posters; the hero stretches them across the page,
- *  where 500 px turns to mush. TMDB serves the same file at w1280. */
-const stillSrc = (poster: string) => poster.replace("/w500/", "/w1280/");
+/**
+ * The catalogue stores w500 posters; stretched across the page they turn to
+ * mush, so the hero asks TMDB for the untouched file and keeps the cheap one
+ * for the stills that have not been shown yet — two big images at a time, not
+ * six.
+ */
+const fullSize = (poster: string) => poster.replace("/w500/", "/original/");
 
 /**
  * One still per title, full width behind the headline. The still fades out
@@ -25,6 +30,8 @@ const stillSrc = (poster: string) => poster.replace("/w500/", "/w1280/");
 export default function Hero({ items, onPlay }: HeroProps) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [promoted, setPromoted] = useState<number[]>([0, 1]);
+  const [synopses, setSynopses] = useState<Record<number, string>>({});
   const count = items.length;
 
   useEffect(() => {
@@ -37,11 +44,34 @@ export default function Hero({ items, onPlay }: HeroProps) {
     return () => window.clearInterval(timer);
   }, [paused, count]);
 
+  // Promote the current and the next still to the full-size file, and never
+  // demote: swapping the source of a picture that is fading out flashes.
+  useEffect(() => {
+    setPromoted((previous) => {
+      const wanted = [index, (index + 1) % count];
+      return wanted.every((position) => previous.includes(position))
+        ? previous
+        : [...new Set([...previous, ...wanted])];
+    });
+  }, [index, count]);
+
+  useEffect(() => {
+    if (!items.length) return;
+    let alive = true;
+    loadSynopses(items.map((entry) => ({ id: entry.id, series: entry.type === "series" }))).then((map) => {
+      if (alive) setSynopses(map);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [items]);
+
   const item = items[index] ?? items[0];
   if (!item) return null;
 
   const go = (delta: number) => setIndex((value) => (value + delta + count) % count);
   const kind = item.category === "anime" ? "ANIME" : item.type === "series" ? "SÉRIE" : "FILM";
+  const synopsis = synopses[item.id];
 
   return (
     <section
@@ -59,10 +89,10 @@ export default function Hero({ items, onPlay }: HeroProps) {
           <img
             key={entry.id}
             className={`mf-hero__still${position === index ? " is-active" : ""}`}
-            src={stillSrc(entry.poster)}
+            src={promoted.includes(position) ? fullSize(entry.poster) : entry.poster}
             alt=""
             decoding="async"
-            loading={position === 0 ? "eager" : "lazy"}
+            loading={position === 0 || position === 1 ? "eager" : "lazy"}
           />
         ))}
       </div>
@@ -80,6 +110,7 @@ export default function Hero({ items, onPlay }: HeroProps) {
             <span className="mf-hero__genres">{item.genres.slice(0, 2).map((key) => GENRE_LABEL[key]).join(" · ")}</span>
           ) : null}
         </div>
+        {synopsis ? <p className="mf-hero__synopsis">{synopsis}</p> : null}
         <div className="mf-hero__actions">
           <button type="button" className="mf-btn mf-btn--primary" onClick={() => onPlay(item)}>
             <Play size={17} strokeWidth={2.4} /> Lecture

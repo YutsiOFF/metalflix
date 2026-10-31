@@ -11,7 +11,8 @@ Site statique (Vite + React + TypeScript) publié sur GitHub Pages : **https://y
   avec affiche et année. Le catalogue vit dans son propre chunk (~1 Mo) pour que l'interface s'affiche sans l'attendre.
 - **Filtres et tri** : catégorie, genre (18 genres, dont Horreur, Science-fiction, Western…), décennie et tri par année,
   combinables avec la recherche.
-- **Carrousel à la une** : six titres qui tournent toutes les 9 s, chacun avec son affiche en fond et en vignette.
+- **Carrousel à la une** : six titres qui tournent toutes les 9 s, chacun avec son affiche en fond plein cadre, fondue vers le bas,
+  une jauge de progression et un court résumé venu de l'article Wikipédia du titre.
 - **Lecteur intégré** : `/api/check/<id>` puis `<iframe>` vers `https://api.moviez.ac/<id>` (film) ou
   `https://api.moviez.ac/serie/<id>/<saison>/<épisode>` (série), avec choix saison / épisode / langue.
 - **Comptes locaux gratuits** : création de profil, connexion, mot de passe étiré en PBKDF2-SHA256 (150 000 tours).
@@ -99,8 +100,13 @@ navigateur (~16) et cassait le shader des surfaces visibles. Le reste de l'inter
 liste qu'on lit fatigue plus qu'il n'habille.
 
 Les vignettes remplissent leur carte : la grille étire toutes les cartes d'une rangée à la hauteur de la plus grande, et
-le bloc interne ne suivait pas, laissant apparaître le liseré chromé en bas. Le liseré est passé à 1 px et le bloc
-interne occupe 100 % de la hauteur.
+le bloc interne ne suivait pas, laissant apparaître le liseré chromé en bas. Le bloc interne occupe 100 % de la hauteur
+donc le contour garde ses 2,5 px de métal — argent, cobalt ou améthyste selon la catégorie, avec un halo assorti.
+
+La vedette demande les affiches en `/original/` pour les deux visuels affichés (les autres restent en `w500`), et le
+résumé vient de Wikipédia : `scripts` ne collecte que `titre, année, affiche`, donc l'id TMDB est résolu vers l'article
+français via Wikidata (`P4947` films, `P4983` séries), deux requêtes mises en cache pour la session. Un titre sans
+article n'affiche simplement pas de paragraphe.
 
 Le fond neutre et les surfaces sombres viennent des variables `--argent-panel`, `--argent-panel-text`,
 `--argent-halo-line` redéfinies dans `src/styles.css`.
