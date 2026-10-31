@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.vite/
+*.local
+scripts/verify-results*.json
+.env
+.env.*
+.DS_Store
