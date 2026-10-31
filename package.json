@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "catalog": "node scripts/build-catalog.mjs"
+    "catalog": "node scripts/build-catalog.mjs",
+    "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {
     "@paper-design/shaders-react": "^0.0.76",

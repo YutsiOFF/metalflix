@@ -56,5 +56,12 @@ Le fond neutre et les surfaces sombres viennent des variables `--argent-panel`, 
 
 ## Déploiement
 
-`.github/workflows/deploy.yml` construit et publie `dist/` sur GitHub Pages à chaque push sur `main`
-(Pages doit être configuré en source « GitHub Actions »).
+Le site est publié sur GitHub Pages depuis la branche `gh-pages`, qui ne contient que le build :
+
+```bash
+npm run deploy
+```
+
+`scripts/deploy.mjs` construit le site puis force-push `dist/` (avec un `.nojekyll`) sur `gh-pages`, et Pages sert
+cette branche en mode « Deploy from a branch ». Un workflow Actions serait possible, mais pousser un fichier dans
+`.github/workflows` demande le scope `workflow` sur le token gh (`gh auth refresh -s workflow`).
