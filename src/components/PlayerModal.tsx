@@ -168,11 +168,20 @@ export default function PlayerModal({
             </div>
           )}
           {status === "ready" && (
+            /*
+             * The player page loads its own ad tag (cdn.fozekikikiminu.com) and
+             * every documented entry point carries it, so the frame is
+             * sandboxed without allow-popups or allow-top-navigation: the ad
+             * network can no longer open a tab, swap an ad under our feet or
+             * navigate away from the film. Playback itself is untouched, and
+             * the frame still cannot reach our origin's storage.
+             */
             <iframe
               key={src}
               className="mf-player__frame"
               src={src}
               title={`Lecteur ${subject.title}`}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock"
               allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
               referrerPolicy="no-referrer"
             />
