@@ -4,6 +4,14 @@ export type MoviezLang = "vf" | "vo" | "vostfr" | "multi";
 
 export const API_BASE = "https://api.moviez.ac";
 
+/**
+ * The player page goes through our own Worker: it serves Moviez's viewer with
+ * the ad scripts stripped and relays `/api/v2/stream`, which refuses any other
+ * origin (a plain iframe on a foreign site gets a 403 and no video). Set to an
+ * empty string to fall back to the raw, ad-supported Moviez page.
+ */
+export const PLAYER_PROXY = "https://site-23c9d24b0ff64195bb28e22f1e3c60f2.freebuff.page";
+
 export interface MoviezCheck {
   available: boolean;
   detectedType?: "movie" | "series";
@@ -39,14 +47,18 @@ export interface PlayerTarget {
   autoplay?: boolean;
 }
 
-/** Build the player URL. Films: `/<id>`, series: `/serie/<id>/<saison>/<épisode>`. */
+/**
+ * Build the player URL. Through the proxy the route is prefixed with `/p`:
+ * `/p/<id>` for films, `/p/serie/<id>/<saison>/<épisode>` for series.
+ */
 export function playerUrl({ id, type, lang, season = 1, episode = 1, autoplay = true }: PlayerTarget): string {
   const params = new URLSearchParams();
   if (lang && lang !== "vf") params.set("lang", lang);
   if (autoplay) params.set("autoplay", "1");
-  const path = type === "series" ? `/serie/${id}/${season}/${episode}` : `/${id}`;
+  const route = type === "series" ? `serie/${id}/${season}/${episode}` : `${id}`;
   const query = params.toString();
-  return `${API_BASE}${path}${query ? `?${query}` : ""}`;
+  const base = PLAYER_PROXY ? `${PLAYER_PROXY}/p` : API_BASE;
+  return `${base}/${route}${query ? `?${query}` : ""}`;
 }
 
 export const LANG_LABEL: Record<string, string> = {

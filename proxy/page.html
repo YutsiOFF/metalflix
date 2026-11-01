@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Fight Club</title>
+<link rel="stylesheet" href="/player2/static/player2.css?v=16">
+<style>:root{--acc:#2b7fff}</style>
+
+
+
+</head>
+<body>
+<div class="p2" id="p2" data-state="idle" tabindex="0"
+     data-autoplay="1" data-next="">
+  <video class="p2-v" id="v" playsinline preload="none" crossorigin="anonymous" x-webkit-airplay="allow" airplay="allow"></video>
+  <div class="p2-cues" id="cues"></div>
+  <div class="p2-poster" id="poster" style="background-image:url('https://image.tmdb.org/t/p/w1280/c6OLXfKAk5BKeR6broC8pYiCquX.jpg')"></div>
+  
+  <a class="p2-api" id="apitag" href="https://api.moviez.ac/" target="_blank" rel="noopener" title="Moviez API — intégrez ce lecteur sur votre site" hidden>API</a>
+  <div class="p2-hero" id="hero">
+    <button class="p2-big" id="big" type="button" aria-label="Lecture"><svg viewBox="0 0 24 24"><path d="M8 5.8v12.4c0 .7.8 1.1 1.4.7l9.2-6.2c.5-.4.5-1.1 0-1.4L9.4 5.1c-.6-.4-1.4 0-1.4.7z"/></svg></button>
+    <div class="p2-resume" id="resume" hidden>
+      <button type="button" id="resumego">Reprendre à <b id="resumet">0:00</b></button>
+      <button type="button" id="resumeno">Depuis le début</button>
+    </div>
+  </div>
+  <div class="p2-spin" id="spin" hidden></div>
+  <button class="p2-unmute" id="unmute" type="button" hidden>Activer le son</button>
+  <div class="p2-flash" id="seekflash" hidden></div>
+  <div class="p2-msg" id="msg" hidden></div>
+  <div class="p2-onair" id="onair" hidden>Lecture sur la TV</div>
+  <div class="p2-next" id="nextbox" hidden>Épisode suivant dans <b id="nextsec">5</b> s <button type="button" id="nextgo">Lancer</button> <button type="button" id="nextno">Annuler</button></div>
+  <div class="p2-ui" id="ui">
+    <div class="p2-bar">
+      <div class="p2-track" id="track"><div class="p2-buf" id="buf"></div><div class="p2-prog" id="prog"></div><div class="p2-knob" id="knob"></div><div class="p2-tip" id="tip" hidden>0:00</div></div>
+    </div>
+    <div class="p2-btns">
+      <button type="button" data-a="play" id="pp" aria-label="Lecture"><svg viewBox="0 0 24 24" class="i-play"><path d="M8 5.8v12.4c0 .7.8 1.1 1.4.7l9.2-6.2c.5-.4.5-1.1 0-1.4L9.4 5.1c-.6-.4-1.4 0-1.4.7z"/></svg><svg viewBox="0 0 24 24" class="i-pause"><path d="M7.2 5h3.1v14H7.2zm6.5 0h3.1v14h-3.1z"/></svg><span id="pplab">Lecture</span></button>
+      <button class="p2-skip" type="button" data-a="back" aria-label="Reculer de 10 secondes"><svg viewBox="0 0 24 24"><path d="M12.2 7.4a5 5 0 1 1-1.5 7.2"/><path d="M11.6 4.4 7.4 7.5l4.2 2.2"/><text x="13.1" y="15.5" text-anchor="middle" font-size="6.4" font-weight="700">10</text></svg></button>
+      <button class="p2-skip" type="button" data-a="fwd" aria-label="Avancer de 10 secondes"><svg viewBox="0 0 24 24"><path d="M11.8 7.4a5 5 0 1 0 1.5 7.2"/><path d="M12.4 4.4 16.6 7.5l-4.2 2.2"/><text x="10.9" y="15.5" text-anchor="middle" font-size="6.4" font-weight="700">10</text></svg></button>
+      <div class="p2-vol"><button type="button" data-a="mute" id="mute" aria-label="Volume"><svg viewBox="0 0 24 24" class="i-vol"><path d="M4.5 9.5v5h3L12 18.2V5.8L7.5 9.5h-3z"/><path d="M15 9.3a3.6 3.6 0 0 1 0 5.4"/><path d="M16.8 7a6.4 6.4 0 0 1 0 10"/></svg><svg viewBox="0 0 24 24" class="i-muted"><path d="M4.5 9.5v5h3L12 18.2V5.8L7.5 9.5h-3z"/><path d="M16 10l4 4M20 10l-4 4"/></svg></button><input type="range" id="volr" min="0" max="1" step="0.05" value="1" aria-label="Volume"></div>
+      <span class="p2-time"><span id="cur">0:00</span><b>/</b><span id="dur">0:00</span></span>
+      <span class="p2-sp"></span>
+      <button type="button" data-a="speed" aria-label="Vitesse"><span id="spdlab">1×</span></button>
+      <button type="button" data-a="audio" id="audiob" hidden aria-label="Langue audio" title="Langue audio"><span id="acode">FR</span></button>
+      <button type="button" data-a="subs" id="subsb" hidden aria-label="Sous-titres"><svg viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M7 11.2h3.2M7 14.2h5.2M13.4 11.2H17M12.2 14.2H17"/></svg><span>Sous-titres</span></button>
+      <button type="button" data-a="menu" class="p2-gear" aria-label="Réglages"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="10" cy="17" r="2.1"/></svg></button>
+      <button type="button" data-a="cast" id="castb" hidden aria-label="Diffuser sur la TV"><svg viewBox="0 0 24 24" class="i-cast"><path d="M4.5 8V6.7A1.7 1.7 0 0 1 6.2 5h11.6A1.7 1.7 0 0 1 19.5 6.7v10.6a1.7 1.7 0 0 1-1.7 1.7H13"/><path d="M4.8 16.2a3.2 3.2 0 0 1 3.2 3.2"/><path d="M4.8 12.6a6.6 6.6 0 0 1 6.6 6.6"/><circle cx="4.8" cy="19.4" r="1"/></svg></button>
+      <button type="button" data-a="fs" aria-label="Plein écran"><svg viewBox="0 0 24 24"><path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4"/></svg></button>
+    </div>
+    <div class="p2-menu" id="menu" hidden></div>
+  </div>
+</div>
+<script>window.P2 = {"lang": "vf", "subs": 0, "t": "bW92aWV8NTUwfDB8MHx2ZnwxNzkzNDkyODI0.0nB-jwxL5WAx6gRjBN_FvLl1"};</script>
+<script src="/anime/static/hls.min.js?v=1.5.20"></script>
+<script src="/player2/static/player2.js?v=18"></script>
+</body></html>

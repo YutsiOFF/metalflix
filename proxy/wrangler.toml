@@ -1,0 +1,5 @@
+name = "metalflix-player"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# No bindings, no storage, no paid plan: the Worker only relays requests.
