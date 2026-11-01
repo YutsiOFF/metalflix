@@ -9,3 +9,12 @@ scripts/verify-results*.json
 
 # Données de collecte (régénérables)
 .cache/
+
+# Proxy dev artefacts (local wrangler + manual checks)
+proxy/.wrangler/
+proxy/*.html
+proxy/*.m3u8
+proxy/*.json.tmp
+proxy/*.ts
+proxy/dev.log
+proxy/stream*.json
