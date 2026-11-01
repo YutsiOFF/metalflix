@@ -13,8 +13,13 @@ Site statique (Vite + React + TypeScript) publié sur GitHub Pages : **https://y
   combinables avec la recherche.
 - **Carrousel à la une** : six titres qui tournent toutes les 9 s, chacun avec son affiche en fond plein cadre, fondue vers le bas,
   une jauge de progression et un court résumé venu de l'article Wikipédia du titre.
-- **Lecteur intégré** : `/api/check/<id>` puis `<iframe>` vers `https://api.moviez.ac/<id>` (film) ou
-  `https://api.moviez.ac/serie/<id>/<saison>/<épisode>` (série), avec choix saison / épisode / langue.
+- **Lecteur intégré** : `/api/check/<id>` puis `<iframe>` vers le lecteur Moviez (film) ou
+  sa variante série, avec choix saison / épisode / langue.
+- **Lecteur sans publicité** : la page du lecteur passe par le proxy `proxy/worker.js`, qui la sert depuis
+  son propre domaine sans ses scripts publicitaires et relaie `/api/v2/stream` ainsi que la playlist et les
+  segments HLS côté serveur. C'est nécessaire : Moviez répond `403` à toute origine étrangère (et son préflight
+  CORS n'autorise que `GET`), donc une iframe directe ne peut ni retirer les pubs ni lire le flux. Le Worker
+  tourne sur l'hébergement gratuit de Sites (quota 10 000 requêtes/jour), sans clé ni base de données.
 - **Comptes locaux gratuits** : création de profil, connexion, mot de passe étiré en PBKDF2-SHA256 (150 000 tours).
   Aucun serveur, aucune inscription externe, rien ne quitte le navigateur.
 - **Historique et watch list par profil**, classés par films, séries et animes, avec saison/épisode vus et date
@@ -122,3 +127,7 @@ npm run deploy
 `scripts/deploy.mjs` construit le site puis force-push `dist/` (avec un `.nojekyll`) sur `gh-pages`, et Pages sert
 cette branche en mode « Deploy from a branch ». Un workflow Actions serait possible, mais pousser un fichier dans
 `.github/workflows` demande le scope `workflow` sur le token gh (`gh auth refresh -s workflow`).
+
+Le proxy du lecteur se déploie séparément, avec `proxy/deploy.json` (Worker ES module, aucun binding) : son URL est
+`PLAYER_PROXY` dans `src/lib/moviez.ts`. La mettre à vide fait retomber le site sur la page Moviez d'origine, pubs
+comprises.
