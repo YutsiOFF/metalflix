@@ -20,6 +20,11 @@ Site statique (Vite + React + TypeScript) publié sur GitHub Pages : **https://y
   segments HLS côté serveur. C'est nécessaire : Moviez répond `403` à toute origine étrangère (et son préflight
   CORS n'autorise que `GET`), donc une iframe directe ne peut ni retirer les pubs ni lire le flux. Le Worker
   tourne sur l'hébergement gratuit de Sites (quota 10 000 requêtes/jour), sans clé ni base de données.
+- **Reprendre votre visionnage** : une rangée de cartes 16:9 en haut de l'accueil, avec le titre, la saison
+  et l'épisode en cours, et la position de lecture. La barre de progression vient du lecteur lui-même :
+  la page du proxy renvoie `currentTime / duration` par `postMessage` toutes les ~4 s, que `PlayerModal`
+  enregistre dans l'historique local (`recordProgress`). Cliquer sur une carte relance directement le bon
+  épisode. Ça marche sans compte (historique « invité »), et la croix retire une carte.
 - **Comptes locaux gratuits** : création de profil, connexion, mot de passe étiré en PBKDF2-SHA256 (150 000 tours).
   Aucun serveur, aucune inscription externe, rien ne quitte le navigateur.
 - **Historique et watch list par profil**, classés par films, séries et animes, avec saison/épisode vus et date

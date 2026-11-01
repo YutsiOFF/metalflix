@@ -1886,3 +1886,223 @@ a:hover {
     transition: none;
   }
 }
+
+/* ── Reprendre votre visionnage ───────────────────────────────────────── */
+
+.mf-section--resume {
+  padding-top: 18px;
+}
+
+.mf-resume {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: clamp(244px, 26vw, 336px);
+  gap: 14px;
+  overflow-x: auto;
+  padding: 4px 4px 18px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.mf-resume > * {
+  scroll-snap-align: start;
+}
+
+.mf-resume__card {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0d0e11;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.mf-resume__card:hover,
+.mf-resume__card:focus-within {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.55);
+}
+
+.mf-resume__open {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mf-resume__open:focus-visible {
+  outline: 2px solid var(--mf-gold);
+  outline-offset: -2px;
+}
+
+.mf-resume__open img,
+.mf-resume__empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: linear-gradient(160deg, #1a1d23, #0c0e11);
+}
+
+.mf-resume__open img {
+  transition: transform 420ms ease, filter 300ms ease;
+}
+
+.mf-resume__card:hover .mf-resume__open img {
+  transform: scale(1.04);
+  filter: brightness(0.78);
+}
+
+.mf-resume__kind {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #06070a;
+  background: #dfe3e8;
+}
+
+.mf-resume__kind--anime {
+  background: #c8a8f2;
+}
+
+.mf-resume__kind--serie {
+  background: #a7c0f2;
+}
+
+.mf-resume__kind--film {
+  background: #e6c24e;
+}
+
+.mf-resume__play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.7);
+}
+
+.mf-resume__card:hover .mf-resume__play,
+.mf-resume__open:focus-visible .mf-resume__play {
+  opacity: 1;
+}
+
+.mf-resume__veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(6, 7, 10, 0.94) 0%,
+    rgba(6, 7, 10, 0.55) 34%,
+    rgba(6, 7, 10, 0.06) 66%,
+    transparent 100%
+  );
+}
+
+.mf-resume__text {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mf-resume__text strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mf-resume__text small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(233, 235, 239, 0.8);
+}
+
+.mf-resume__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.mf-resume__bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--mf-gold), #f4e3a8);
+}
+
+.mf-resume__dismiss {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(6, 7, 10, 0.62);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.mf-resume__card:hover .mf-resume__dismiss,
+.mf-resume__dismiss:focus-visible {
+  opacity: 1;
+}
+
+@media (max-width: 760px) {
+  .mf-resume {
+    grid-auto-columns: 78vw;
+  }
+
+  .mf-resume__dismiss {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-resume__card,
+  .mf-resume__open img {
+    transition: none;
+  }
+
+  .mf-resume__card:hover {
+    transform: none;
+  }
+}

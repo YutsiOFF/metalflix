@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, Film, LogIn, Search, Sparkles, Tv } from "lucide-react";
 import {
   CATEGORY_LABEL,
@@ -17,19 +17,22 @@ import {
 } from "./lib/catalog";
 import { currentProfileId, listProfiles, signOut, type Profile } from "./lib/accounts";
 import {
-  EMPTY_LIBRARY,
   clearHistory,
   markDone,
+  LOCAL_PROFILE_ID,
   readLibrary,
+  recordProgress,
   recordWatch,
   removeHistory,
   snapshotOf,
   toggleWatchlist,
+  type HistoryEntry,
   type Library,
   type LibraryItem,
 } from "./lib/library";
 import Dropdown from "./components/Dropdown";
 import Hero from "./components/Hero";
+import ResumeRail from "./components/ResumeRail";
 import PosterCard from "./components/PosterCard";
 import PlayerModal, { type PlaySubject } from "./components/PlayerModal";
 import DirectLookup from "./components/DirectLookup";
@@ -77,12 +80,16 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [manual, setManual] = useState<PlaySubject | null>(null);
+  const [resume, setResume] = useState<{ id: number; season: number; episode: number } | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(() => {
     const id = currentProfileId();
     return id ? listProfiles().find((p) => p.id === id) ?? null : null;
   });
-  const [library, setLibrary] = useState<Library>(() => (profile ? readLibrary(profile.id) : EMPTY_LIBRARY));
+  // Signed-out viewers still get history and the resume rail, under a local id.
+  const libId = profile?.id ?? LOCAL_PROFILE_ID;
+  const [library, setLibrary] = useState<Library>(() => readLibrary(profile ? profile.id : LOCAL_PROFILE_ID));
+  const progressRef = useRef({ key: "", ratio: -1 });
   const [catalog, setCatalog] = useState<Title[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -132,6 +139,12 @@ export default function App() {
 
   const wantedIds = useMemo(() => new Set(library.watchlist.map((item) => item.id)), [library.watchlist]);
 
+  /** Started but not finished, newest first — what "reprendre" means here. */
+  const resumable = useMemo(
+    () => library.history.filter((item) => !item.done && (item.progress ?? 0) < 0.95).slice(0, 12),
+    [library.history],
+  );
+
   const filtered = useMemo(
     () =>
       catalog.filter(
@@ -167,12 +180,14 @@ export default function App() {
     [catalog],
   );
 
-  function openTitle(item: Title) {
+  function openTitle(item: Title, at?: { season: number; episode: number }) {
+    setResume(at ? { id: item.id, ...at } : null);
     window.location.hash = `/t/${item.id}`;
   }
 
   function closePlayer() {
     setManual(null);
+    setResume(null);
     history.pushState("", document.title, `${window.location.pathname}${window.location.search}`);
     setRoute(parseHash());
   }
@@ -186,9 +201,8 @@ export default function App() {
   }
 
   function onWatched(subject: PlaySubject, season: number, episode: number) {
-    if (!profile) return;
     setLibrary(
-      recordWatch(profile.id, {
+      recordWatch(libId, {
         id: subject.id,
         title: subject.title,
         poster: subject.poster ?? null,
@@ -201,9 +215,60 @@ export default function App() {
   }
 
   function toggleDone(id: number) {
-    if (!profile) return;
     const current = library.history.find((item) => item.id === id)?.done ?? false;
-    setLibrary(markDone(profile.id, id, !current));
+    setLibrary(markDone(libId, id, !current));
+  }
+
+  /**
+   * Position reported by the player page (through the proxy). Values that move
+   * by less than a point are dropped: the rail would otherwise re-render and
+   * rewrite localStorage every few seconds for no visible change.
+   */
+  function handleProgress(update: { season: number; episode: number; ratio: number }) {
+    const subject = openSubject;
+    if (!subject) return;
+    const key = `${subject.id}:${update.season}:${update.episode}`;
+    const last = progressRef.current;
+    if (last.key === key && Math.abs(last.ratio - update.ratio) < 0.01) return;
+    progressRef.current = { key, ratio: update.ratio };
+
+    setLibrary(() => {
+      if (!readLibrary(libId).history.some((item) => item.id === subject.id)) {
+        recordWatch(libId, {
+          id: subject.id,
+          title: subject.title,
+          poster: subject.poster ?? null,
+          year: subject.year ?? null,
+          type: subject.type,
+          category: subject.category ?? (subject.type === "movie" ? "film" : "serie"),
+          ...(subject.type === "series" ? { season: update.season, episode: update.episode } : {}),
+        });
+      }
+      return recordProgress(
+        libId,
+        subject.id,
+        subject.type === "series" ? { season: update.season, episode: update.episode } : {},
+        update.ratio,
+      );
+    });
+  }
+
+  function resumeFrom(entry: HistoryEntry) {
+    const at = { season: entry.season ?? 1, episode: entry.episode ?? 1 };
+    const title = findTitle(catalog, entry.id);
+    if (title) {
+      openTitle(title, at);
+      return;
+    }
+    setResume({ id: entry.id, ...at });
+    setManual({
+      id: entry.id,
+      type: entry.type,
+      title: entry.title,
+      poster: entry.poster ?? undefined,
+      year: entry.year,
+      category: entry.category,
+    });
   }
 
   function openLibraryItem(item: LibraryItem) {
@@ -231,7 +296,7 @@ export default function App() {
   function handleSignOut() {
     signOut();
     setProfile(null);
-    setLibrary(EMPTY_LIBRARY);
+    setLibrary(readLibrary(LOCAL_PROFILE_ID));
   }
 
   function exportLibrary() {
@@ -337,6 +402,14 @@ export default function App() {
         ) : (
           <>
             <Hero items={featured} onPlay={openTitle} />
+
+            {!searchMode && resumable.length > 0 ? (
+              <ResumeRail
+                items={resumable}
+                onResume={resumeFrom}
+                onDismiss={(id) => setLibrary(removeHistory(libId, id))}
+              />
+            ) : null}
 
             <section className="mf-toolbar" aria-label="Filtres">
               <div className="mf-seg" role="tablist" aria-label="Catégories">
@@ -458,7 +531,9 @@ export default function App() {
 
       {openSubject ? (
         <PlayerModal
+          key={openSubject.id}
           subject={openSubject}
+          initial={resume?.id === openSubject.id ? resume : undefined}
           onClose={closePlayer}
           wanted={wantedIds.has(openSubject.id)}
           done={openDone}
@@ -474,6 +549,7 @@ export default function App() {
             })
           }
           onWatched={onWatched}
+          onProgress={handleProgress}
         />
       ) : null}
 

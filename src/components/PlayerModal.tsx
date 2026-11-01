@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, BookmarkCheck, Check, ExternalLink, SkipForward, X } from "lucide-react";
-import { LANG_LABEL, checkTitle, playerUrl, type MoviezLang } from "../lib/moviez";
+import { LANG_LABEL, PLAYER_PROXY, checkTitle, playerUrl, type MoviezLang } from "../lib/moviez";
 import type { Category } from "../lib/catalog";
 
 export interface PlaySubject {
@@ -17,11 +17,14 @@ export interface PlaySubject {
 interface PlayerModalProps {
   subject: PlaySubject;
   onClose: () => void;
+  /** Set when the viewer resumes from the resume rail: start on that episode. */
+  initial?: { season: number; episode: number };
   wanted?: boolean;
   done?: boolean;
   onToggleWatch?: (subject: PlaySubject) => void;
   onToggleDone?: () => void;
   onWatched?: (subject: PlaySubject, season: number, episode: number) => void;
+  onProgress?: (update: { season: number; episode: number; ratio: number }) => void;
 }
 
 const PLAYABLE: MoviezLang[] = ["vf", "vo", "vostfr", "multi"];
@@ -29,14 +32,16 @@ const PLAYABLE: MoviezLang[] = ["vf", "vo", "vostfr", "multi"];
 export default function PlayerModal({
   subject,
   onClose,
+  initial,
   wanted = false,
   done = false,
   onToggleWatch,
   onToggleDone,
   onWatched,
+  onProgress,
 }: PlayerModalProps) {
-  const [season, setSeason] = useState(1);
-  const [episode, setEpisode] = useState(1);
+  const [season, setSeason] = useState(initial?.season ?? 1);
+  const [episode, setEpisode] = useState(initial?.episode ?? 1);
   const [lang, setLang] = useState<MoviezLang>("vf");
   const [status, setStatus] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
   const [live, setLive] = useState<{ seasons?: number; languages?: string[] }>({});
@@ -48,6 +53,8 @@ export default function PlayerModal({
   // `subject` is a fresh object on every App render, so recording keyed off it
   // fed setState → render → record → setState. The signature guard stops that.
   const recordedRef = useRef("");
+  const progressRef = useRef(onProgress);
+  progressRef.current = onProgress;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -90,6 +97,36 @@ export default function PlayerModal({
       document.body.style.overflow = previous;
     };
   }, [onClose]);
+
+  // The player page lives on the proxy origin and reports its position through
+  // postMessage (see proxy/worker.js): a cross-origin frame has no other way to
+  // tell us where the viewer actually is.
+  useEffect(() => {
+    if (!PLAYER_PROXY) return;
+    let origin = "";
+    try {
+      origin = new URL(PLAYER_PROXY).origin;
+    } catch {
+      return;
+    }
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== origin) return;
+      const data = event.data as { source?: string; type?: string; path?: string; ratio?: number } | null;
+      if (!data || data.source !== "metalflix-player" || data.type !== "progress") return;
+      if (typeof data.ratio !== "number" || !Number.isFinite(data.ratio)) return;
+      const match = /^\/p\/(?:serie\/(\d+)\/(\d+)\/(\d+)|(\d+))/.exec(data.path ?? "");
+      if (!match) return;
+      const id = Number(match[4] ?? match[1]);
+      if (id !== subject.id) return;
+      progressRef.current?.({
+        season: match[2] ? Number(match[2]) : 1,
+        episode: match[3] ? Number(match[3]) : 1,
+        ratio: Math.min(1, Math.max(0, data.ratio)),
+      });
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [subject.id]);
 
   const languages = useMemo(() => {
     const list = (live.languages ?? subject.languages ?? []).filter((l): l is MoviezLang =>

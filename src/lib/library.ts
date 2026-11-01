@@ -19,9 +19,17 @@ export interface LibraryItem {
 export interface HistoryEntry extends LibraryItem {
   season?: number;
   episode?: number;
-  /** Explicitly marked as watched to the end — an iframe cannot tell us. */
+  /** 0–1, reported by the player page itself (see `recordProgress`). */
+  progress?: number;
+  /** Explicitly marked as watched to the end, or playback left past ~95 %. */
   done?: boolean;
 }
+
+/**
+ * Device-level history for viewers without a profile: the resume rail should
+ * work for someone who just opened the link, with nothing to create.
+ */
+export const LOCAL_PROFILE_ID = "invite";
 
 export interface Library {
   history: HistoryEntry[];
@@ -84,6 +92,36 @@ export function markDone(profileId: string, id: number, done: boolean): Library 
     ...library,
     history: library.history.map((item) => (item.id === id ? { ...item, done } : item)),
   });
+}
+
+/**
+ * Playback position reported by the player page. The entry already exists (the
+ * player recorded it when it opened), so this only refreshes the season/episode
+ * and how far in the viewer is — the history order is left alone.
+ */
+export function recordProgress(
+  profileId: string,
+  id: number,
+  position: { season?: number; episode?: number },
+  progress: number,
+): Library {
+  const library = readLibrary(profileId);
+  const index = library.history.findIndex((item) => item.id === id);
+  if (index < 0) return library;
+
+  const ratio = Math.min(1, Math.max(0, progress));
+  const current = library.history[index];
+  const season = position.season ?? current.season;
+  const episode = position.episode ?? current.episode;
+  if (current.progress === ratio && current.season === season && current.episode === episode) return library;
+
+  const history = [...library.history];
+  history[index] = {
+    ...current,
+    ...(season && episode ? { season, episode } : {}),
+    progress: ratio,
+  };
+  return write(profileId, { ...library, history });
 }
 
 export function clearHistory(profileId: string): Library {

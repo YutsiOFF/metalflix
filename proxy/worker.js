@@ -13,13 +13,36 @@ const ORIGIN = "https://api.moviez.ac";
 const AD_HOST =
   /(onetag|fozekikikiminu|pla\.uqload\.vc|plausible|doubleclick|googlesyndication|adservice|popads|propellerads|adnxs|criteo|exoclick|juicyads)/i;
 
+/**
+ * Playback position, reported back to the site that embeds this page: MetalFlix
+ * turns it into the progress bar of "Reprendre votre visionnage". The frame is
+ * cross-origin, so postMessage is the only channel — no cookies, no storage.
+ * Written as a plain string so nothing here can be mistaken for a template.
+ */
+const TRACKER =
+  // Several <video> elements exist on the page; the feature is the longest one.
+  '<script>(function(){var last=-1,at=0;' +
+  'function pick(){var l=document.querySelectorAll("video"),b=null;' +
+  'for(var i=0;i<l.length;i++){var d=l[i].duration;' +
+  'if(isFinite(d)&&d>120&&(!b||d>b.duration))b=l[i];}return b;}' +
+  'function tick(){var v=pick();if(v){' +
+  'var r=v.currentTime/v.duration,n=Date.now();' +
+  'if(Math.abs(r-last)>0.004&&n-at>4000){last=r;at=n;try{' +
+  'window.top.postMessage({source:"metalflix-player",type:"progress",path:location.pathname,' +
+  'position:v.currentTime,duration:v.duration,ratio:r},"*");}catch(e){}}}' +
+  'setTimeout(tick,2000);}tick();})()</script>';
+
 function cleanPage(html) {
-  return html
+  const cleaned = html
     // Drop every script whose tag or body touches an ad host; keep the player.
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, (tag) => (AD_HOST.test(tag) ? "" : tag))
     .replace(/\sdata-ts-[a-z-]+=["'][^"']*["']/gi, "")
     // Preconnects to ad hosts are pointless once the scripts are gone.
     .replace(/<link\b[^>]*href=["'][^"']*(?:onetag|fozekikikiminu|uqload)[^"']*["'][^>]*>/gi, "");
+
+  // Added last, so the ad filter above never sees (and strips) the tracker.
+  if (cleaned.includes("</body>")) return cleaned.replace(/<\/body>/i, TRACKER + "</body>");
+  return cleaned + TRACKER;
 }
 
 const json = (data, status = 200) =>
