@@ -9,6 +9,7 @@ import {
   dailyPicks,
   findTitle,
   loadCatalog,
+  loadRestCatalog,
   searchTitles,
   yearsOf,
   type Category,
@@ -129,6 +130,11 @@ export default function App() {
       if (!alive) return;
       setCatalog(items);
       setLoading(false);
+      // The rest of the catalogue follows in a second chunk: counts, search and
+      // pagination widen once it lands, without holding up the first paint.
+      loadRestCatalog((all) => {
+        if (alive) setCatalog(all);
+      });
     });
     return () => {
       alive = false;

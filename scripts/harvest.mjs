@@ -7,7 +7,9 @@
 // Run: node scripts/harvest.mjs [maxPagesPerKind]
 import { mkdir, writeFile } from "node:fs/promises";
 
-const MAX_PAGES = Number(process.argv[2] ?? 60); // 60 × 120 = 7 200 items per kind
+// 120 items per page. Movies go much deeper than series: the API serves ~38 000
+// movie rows but only ~11 000 tv rows, so the series harvest stops on its own.
+const PAGES = { movie: Number(process.argv[2] ?? 60), tv: Number(process.argv[3] ?? 60) };
 const STEP = 120;
 const CONCURRENCY = 6;
 
@@ -32,15 +34,21 @@ async function fetchPage(kind, offset) {
 }
 
 for (const kind of ["movie", "tv"]) {
-  const offsets = Array.from({ length: MAX_PAGES }, (_, i) => i * STEP);
+  const maxPages = PAGES[kind];
+  const offsets = Array.from({ length: maxPages }, (_, i) => i * STEP);
   const items = [];
   let cursor = 0;
+  let ended = false; // past the last page: stop asking, the worker keeps the others busy
   const workers = Array.from({ length: CONCURRENCY }, async () => {
-    while (cursor < offsets.length) {
+    while (cursor < offsets.length && !ended) {
       const offset = offsets[cursor++];
       const page = await fetchPage(kind, offset);
       items.push(...page);
-      if (page.length === 0) console.log(`  ${kind}: offset ${offset} vide`);
+      if (items.length % 6000 < page.length) console.log(`  ${kind}: ${items.length} lignes (offset ${offset})`);
+      if (page.length === 0) {
+        ended = true;
+        console.log(`  ${kind}: fin du catalogue à l'offset ${offset}`);
+      }
     }
   });
   await Promise.all(workers);

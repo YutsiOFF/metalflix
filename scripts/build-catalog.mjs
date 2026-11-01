@@ -96,7 +96,10 @@ for (const item of [...movies, ...shows]) {
     id,
     title: item.title,
     year: item.year,
-    code: isTv ? (animeIds.has(id) ? 2 : 1) : 0,
+    // A TMDB id is one thing or the other, but the API's two browse lists
+    // overlap: an anime series also showed up among the movies, so the anime
+    // flag wins over the list it came from.
+    code: animeIds.has(id) ? 2 : isTv ? 1 : 0,
     poster: posterPath(item.poster),
     notable: isTv ? notableSeries.has(id) : notableFilms.has(id),
   });
@@ -111,10 +114,19 @@ const compact = rows.map((row) => {
   const mask = genreMasks[row.id] ?? 0;
   return mask ? [row.id, row.title, row.year, row.code, row.poster, mask] : [row.id, row.title, row.year, row.code, row.poster];
 });
-const json = JSON.stringify(compact);
+const ESSENTIAL = 14_000;
 
 await mkdir(new URL("../src/data/", import.meta.url), { recursive: true });
-await writeFile(new URL("../src/data/catalog.json", import.meta.url), json + "\n");
+// Two chunks: the head of the sorted list (recognisable + recent) paints first,
+// the deep catalogue arrives in the background. Together they are the json.
+await writeFile(
+  new URL("../src/data/catalog.json", import.meta.url),
+  JSON.stringify(compact.slice(0, ESSENTIAL)) + "\n",
+);
+await writeFile(
+  new URL("../src/data/catalog-rest.json", import.meta.url),
+  JSON.stringify(compact.slice(ESSENTIAL)) + "\n",
+);
 
 const counts = rows.reduce(
   (acc, row) => ({ ...acc, [["film", "serie", "anime"][row.code]]: (acc[["film", "serie", "anime"][row.code]] ?? 0) + 1 }),
@@ -122,4 +134,7 @@ const counts = rows.reduce(
 );
 console.log(`catalogue: ${rows.length} titres`, counts);
 const tagged = rows.filter((row) => genreMasks[row.id]).length;
-console.log(`taille: ${(json.length / 1024).toFixed(0)} Kio · notables: ${rows.filter((r) => r.notable).length} · genre: ${tagged}`);
+const head = compact.slice(0, ESSENTIAL).length;
+console.log(
+  `taille: premier chunk ${head} titres · notables: ${rows.filter((r) => r.notable).length} · genre: ${tagged}`,
+);

@@ -81,20 +81,15 @@ const POSTER_BASE = "https://image.tmdb.org/t/p/w500/";
 const CATEGORIES: Category[] = ["film", "serie", "anime"];
 
 let cached: Title[] | null = null;
+let rest: Promise<void> | null = null;
 
 export function genresOf(mask: number): GenreKey[] {
   if (!mask) return [];
   return GENRE_ORDER.filter((_, index) => (mask & (1 << index)) !== 0);
 }
 
-/**
- * The 13k-title catalogue lives in its own chunk (~1 MB), so the shell paints
- * before it arrives instead of blocking the first render.
- */
-export async function loadCatalog(): Promise<Title[]> {
-  if (cached) return cached;
-  const rows = (await import("../data/catalog.json")).default as CatalogRow[];
-  cached = rows.map(([id, title, year, code, path, mask]) => {
+function toTitles(rows: CatalogRow[]): Title[] {
+  return rows.map(([id, title, year, code, path, mask]) => {
     const category = CATEGORIES[code] ?? "film";
     return {
       id,
@@ -107,7 +102,34 @@ export async function loadCatalog(): Promise<Title[]> {
       genres: genresOf(mask ?? 0),
     } satisfies Title;
   });
+}
+
+/**
+ * The catalogue is split in two chunks: this one carries the ~14 000 titles the
+ * rails and the default sort show (recognisable first, then newest), so the
+ * shell paints on it instead of waiting for the whole 46k-row file.
+ */
+export async function loadCatalog(): Promise<Title[]> {
+  if (cached) return cached;
+  const rows = (await import("../data/catalog.json")).default as CatalogRow[];
+  cached = toTitles(rows);
   return cached;
+}
+
+/**
+ * The deep catalogue — every film the API serves, back to the silents — rides a
+ * second chunk fetched right after the first paint, then widens the counts and
+ * the search. `onMerged` receives the complete list once it is there.
+ */
+export async function loadRestCatalog(onMerged: (list: Title[]) => void): Promise<void> {
+  if (rest) return rest;
+  rest = (async () => {
+    const rows = (await import("../data/catalog-rest.json")).default as CatalogRow[];
+    const base = cached ?? (await loadCatalog());
+    cached = [...base, ...toTitles(rows)];
+    onMerged(cached);
+  })();
+  return rest;
 }
 
 export const CATEGORY_LABEL: Record<Category | "all", string> = {

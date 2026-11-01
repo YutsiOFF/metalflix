@@ -7,8 +7,10 @@ Site statique (Vite + React + TypeScript) publié sur GitHub Pages : **https://y
 
 ## Ce que fait le site
 
-- **Catalogue de 13 819 titres** (7 234 films, 5 379 séries, 1 206 animes), tous réellement servis par l'API Moviez,
-  avec affiche et année. Le catalogue vit dans son propre chunk (~1 Mo) pour que l'interface s'affiche sans l'attendre.
+- **Catalogue de 46 322 titres** (37 750 films, 6 989 séries, 1 583 animes), tous réellement servis par l'API Moviez,
+  avec affiche et année — c'est tout ce que `/api/browse` expose, pas un échantillon. Il est découpé en deux chunks :
+  les 14 000 titres du haut de liste (~1 Mo) peignent l'interface, le reste (~2,4 Mo) arrive en arrière-plan et élargit
+  les compteurs, la recherche et la pagination.
 - **Filtres et tri** : catégorie, genre (18 genres, dont Horreur, Science-fiction, Western…), décennie et tri par année,
   combinables avec la recherche.
 - **Carrousel à la une** : six titres qui tournent toutes les 9 s, chacun avec son affiche en fond plein cadre, fondue vers le bas,
@@ -58,15 +60,16 @@ Rien n'est saisi à la main : les titres, affiches et années viennent des répo
 servent seulement à classer les animes et à remonter les titres connus.
 
 ```bash
-node scripts/harvest.mjs 60        # ~7 200 films + ~7 200 séries via /api/browse
+node scripts/harvest.mjs 330 110   # pages de 120 : ~38 200 films + ~8 800 séries via /api/browse
 node scripts/wikidata.mjs          # ids notables (films/séries) + animes
 node scripts/genres.mjs            # genres par id TMDB (masque de bits)
 node scripts/build-catalog.mjs     # fusionne et écrit src/data/catalog.json
 ```
 
-`src/data/catalog.json` est un tableau compact `[tmdbId, titre, année, code, cheminAffiche, masqueGenres?]` avec
-`code` 0=film, 1=série, 2=anime, trié par notoriété puis par année — les données brutes de collecte restent dans
-`.cache/` (non versionné).
+La récolte s'arrête d'elle-même quand une page revient vide : les films vont jusqu'à l'offset ~38 400, les séries
+jusqu'à ~11 500. `src/data/catalog.json` (les 14 000 premiers) et `src/data/catalog-rest.json` (le reste) sont deux
+tableaux compacts `[tmdbId, titre, année, code, cheminAffiche, masqueGenres?]` avec `code` 0=film, 1=série, 2=anime,
+tirés du même tri par notoriété puis par année — les données brutes de collecte restent dans `.cache/` (non versionné).
 
 Les genres ne viennent pas de Moviez (`/api/browse` ni `/api/check` ne les exposent) : `scripts/genres.mjs` les collecte
 sur Wikidata, une requête par genre pour les films et une requête groupée sur les libellés réellement utilisés pour les
