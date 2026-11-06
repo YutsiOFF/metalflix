@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <script type="module" crossorigin src="./assets/polyfills-B8xSFS1S.js"></script>
+
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MetalFlix" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b0b0d" />
+    <title>MetalFlix — films, séries et animes</title>
+    <meta
+      name="description"
+      content="MetalFlix : films, séries et animes, bandeau à la une, carrousels et lecteur sans publicité. Interface inspirée de dx.bi."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://image.tmdb.org" />
+    <link rel="preconnect" href="https://api.moviez.ac" />
+    <meta property="og:title" content="MetalFlix" />
+    <meta property="og:description" content="Films, séries et animes — carrousels façon Netflix, lecteur sans publicité." />
+    <meta property="og:type" content="website" />
+    <style>
+      /* Painted before the bundle loads, so a TV never shows a white page. */
+      html,
+      body {
+        margin: 0;
+        background: #08090b;
+        color: #f3f4f6;
+      }
+      /* The layout is built for the phone width, so pinching out only ever
+         left the page floating inside a white frame. Panning stays free. */
+      html {
+        touch-action: pan-x pan-y;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+      .mf-boot {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 14px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #8a8a96;
+      }
+      .mf-boot strong {
+        color: #e50914;
+        font-weight: 700;
+      }
+    </style>
+    <script>
+      // iOS Safari ignores user-scalable=no, so pinch zoom is also stopped at
+      // the event level. Scrolling, tapping and video controls stay untouched.
+      (function () {
+        ["gesturestart", "gesturechange", "gestureend"].forEach(function (type) {
+          document.addEventListener(
+            type,
+            function (event) {
+              event.preventDefault();
+            },
+            { passive: false },
+          );
+        });
+        document.addEventListener(
+          "touchmove",
+          function (event) {
+            if (event.touches.length > 1) event.preventDefault();
+          },
+          { passive: false },
+        );
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-C5_lD1tE.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CKD8vNg0.css">
+    <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();if(location.protocol!="file:"){window.__vite_is_modern_browser=true}</script>
+    <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
+  </head>
+  <body>
+    <div id="root"><div class="mf-boot">Chargement de <strong>METALFLIX</strong>…</div></div>
+    <script>
+      // Smart TV browsers fail silently: a syntax they do not know leaves an
+      // empty page with no clue. This turns that into a readable message.
+      (function () {
+        var done = false;
+        function fail(message) {
+          if (done) return;
+          var root = document.getElementById("root");
+          if (!root || !root.querySelector(".mf-boot")) {
+            done = true;
+            return;
+          }
+          done = true;
+          root.innerHTML =
+            '<div style="padding:12vh 8vw;font-family:system-ui,sans-serif;line-height:1.65;color:#f3f4f6">' +
+            '<h1 style="font-size:1.35rem;margin:0 0 14px">MetalFlix ne peut pas démarrer sur cet appareil</h1>' +
+            '<p style="margin:0 0 10px;color:#9aa1ad">' +
+            message +
+            "</p>" +
+            '<p style="margin:0;color:#9aa1ad">Ouvrez le site dans un navigateur récent (Chrome, Edge, Firefox ou Safari) ou mettez à jour le navigateur du téléviseur.</p>' +
+            "</div>";
+        }
+        window.addEventListener("error", function (event) {
+          fail("Erreur de chargement : " + (event.message || "script bloqué"));
+        });
+        window.addEventListener("unhandledrejection", function () {
+          fail("Le catalogue n'a pas pu être chargé.");
+        });
+        setTimeout(function () {
+          fail("Le chargement a pris trop de temps.");
+        }, 20000);
+      })();
+    </script>
+    <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
+    <script nomodule crossorigin id="vite-legacy-polyfill" src="./assets/polyfills-legacy-DVKQsO4i.js"></script>
+    <script nomodule crossorigin id="vite-legacy-entry" data-src="./assets/index-legacy-7OFw4mu1.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+  </body>
+</html>
