@@ -428,6 +428,33 @@ export function ratedTop(list: Title[], count: number): Title[] {
   return picked.length ? picked : dailyPicks(list, count);
 }
 
+// -------------------------------------------------------------------- vedette
+/**
+ * The hero: the best recent films (the same TMDB-rated list as the Top 10,
+ * scripts/top-rated.mjs), drawn at random from the top of that list. Called
+ * again, it draws again — App does so at every load and every few hours.
+ */
+export function heroPicks(list: Title[], count: number, poolSize = 40): Title[] {
+  const films = new Map<number, Title>();
+  for (const item of list) {
+    if (item.category === "film" && !item.anime && item.poster && !item.pending) films.set(item.id, item);
+  }
+  const pool: Title[] = [];
+  for (const id of TOP_IDS) {
+    const item = films.get(id);
+    if (item) pool.push(item);
+    if (pool.length === poolSize) break;
+  }
+  if (pool.length < count) return dailyPicks(list.filter((item) => item.category === "film"), count);
+  // Fisher–Yates on a copy: every film of the pool has the same chance.
+  const deck = [...pool];
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck.slice(0, count);
+}
+
 // ------------------------------------------------------------------ top séries
 // The catalogue carries no popularity signal for series (its head is simply the
 // newest year), so the shelf draws from the series everybody knows, kept only

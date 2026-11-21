@@ -8,12 +8,12 @@ import {
   PLATFORM_LABEL,
   PLATFORM_ORDER,
   countByCategory,
-  dailyPicks,
   findTitle,
   loadCatalog,
   loadFreshAdditions,
   loadRestCatalog,
   mergeTitles,
+  heroPicks,
   ratedTop,
   seriesTop,
   searchTitles,
@@ -161,15 +161,22 @@ export default function App() {
   const [catalog, setCatalog] = useState<Title[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Three titles in the hero: only the newest, only three, and never an anime —
-  // the anime shelf has its own rows further down.
-  const featured = useMemo(
-    () =>
-      catalog.length
-        ? dailyPicks(catalog.filter((item) => item.category !== "anime" && !item.anime), 3)
-        : [],
-    [catalog],
-  );
+  // The hero: five of the best recent films, drawn again at every visit and,
+  // for a tab left open, every five hours.
+  const [heroDraw, setHeroDraw] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setHeroDraw((value) => value + 1), 5 * 60 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  // Drawn once the catalogue is there, not again when its second chunk lands:
+  // the banner must not swap films under the viewer's eyes.
+  const [featured, setFeatured] = useState<Title[]>([]);
+  const catalogRef = useRef(catalog);
+  catalogRef.current = catalog;
+  const hasCatalog = catalog.length > 0;
+  useEffect(() => {
+    if (hasCatalog) setFeatured(heroPicks(catalogRef.current, 5));
+  }, [hasCatalog, heroDraw]);
   // « Top 10 des films aujourd'hui » : les films sortis récemment, classés par
   // note TMDB (scripts/top-rated.mjs) et limités à ce que le catalogue peut lire.
   const topFilms = useMemo(() => (catalog.length ? ratedTop(catalog, 10) : []), [catalog]);
