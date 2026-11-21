@@ -141,3 +141,42 @@ export function animeSamaPlayerUrl({
 }): string {
   return `${PLAYER_PROXY}/as/p/${encodeURIComponent(slug)}/${encodeURIComponent(saison)}/${encodeURIComponent(version)}/${episode}`;
 }
+
+/**
+ * The episodes Moviez really holds, season by season: `/api/serie/<id>` lists
+ * every file it has, with its version (vf, vostfr…) and its status. Only the
+ * ready ones count, so an episode that has not aired yet never shows up in the
+ * list. Map: season → episode → versions available.
+ */
+export type EpisodeIndex = Map<number, Map<number, Set<string>>>;
+
+const episodeCache = new Map<number, Promise<EpisodeIndex>>();
+
+export function loadEpisodes(tmdbId: number): Promise<EpisodeIndex> {
+  const known = episodeCache.get(tmdbId);
+  if (known) return known;
+  const job = fetch(`${API_BASE}/api/serie/${tmdbId}`, { headers: { accept: "application/json" } })
+    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+    .then((data: { episodes?: { season?: number; episode?: number; version?: string; status?: string }[] }) => {
+      const index: EpisodeIndex = new Map();
+      for (const row of data.episodes ?? []) {
+        const season = Number(row.season);
+        const episode = Number(row.episode);
+        // Episode 0 is a special / recap; "ready" is a file that plays.
+        if (!season || !episode || season < 1 || episode < 1) continue;
+        if (row.status && row.status !== "ready") continue;
+        const bySeason = index.get(season) ?? new Map<number, Set<string>>();
+        const versions = bySeason.get(episode) ?? new Set<string>();
+        if (row.version) versions.add(String(row.version).toLowerCase());
+        bySeason.set(episode, versions);
+        index.set(season, bySeason);
+      }
+      return index;
+    })
+    .catch((error) => {
+      episodeCache.delete(tmdbId);
+      throw error;
+    });
+  episodeCache.set(tmdbId, job);
+  return job;
+}

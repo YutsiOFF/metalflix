@@ -21,6 +21,8 @@ import {
   LANG_LABEL,
   NoStreamError,
   PLAYER_PROXY,
+  loadEpisodes,
+  type EpisodeIndex,
   animeSamaInfoUrl,
   animeSamaPlayerUrl,
   checkTitle,
@@ -40,6 +42,7 @@ import {
   stopCasting,
 } from "../lib/cast";
 import { loadDetails, type TitleDetails } from "../lib/details";
+import Dropdown from "./Dropdown";
 import { loadBackdrops } from "../lib/artwork";
 import { GENRE_LABEL, type Category, type GenreKey } from "../lib/catalog";
 
@@ -129,6 +132,8 @@ export default function PlayerModal({
   const [status, setStatus] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
   const [live, setLive] = useState<{ seasons?: number; languages?: string[] }>({});
   const [asSeasons, setAsSeasons] = useState<{ saison: string; versions: string[] }[]>([]);
+  /** Real episode list from Moviez (series only); null until it answers. */
+  const [episodeIndex, setEpisodeIndex] = useState<EpisodeIndex | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [details, setDetails] = useState<TitleDetails | null>(null);
   const [backdrop, setBackdrop] = useState("");
@@ -261,6 +266,22 @@ export default function PlayerModal({
       });
     return () => controller.abort();
   }, [isSama, subject.id, subject.slug]);
+
+  useEffect(() => {
+    setEpisodeIndex(null);
+    if (subject.type !== "series" || isSama) return;
+    let alive = true;
+    loadEpisodes(subject.id)
+      .then((index) => {
+        if (alive && index.size) setEpisodeIndex(index);
+      })
+      .catch(() => {
+        // No list: the old season/episode counters stay as the fallback.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isSama, subject.id, subject.type]);
 
   // The sheet's text and trailer load in the background: the hero is already
   // worth looking at while they arrive.
@@ -950,6 +971,59 @@ export default function PlayerModal({
 
   const seasonCount = isSama ? asSeasons.length || 1 : live.seasons ?? subject.seasons ?? 1;
   const seasons = Math.max(1, Math.min(seasonCount || 1, 60));
+
+  /**
+   * Seasons and episodes that really exist. With Moviez's list, an episode
+   * that has not aired (no file yet) is simply absent; episodes are filtered
+   * to the chosen version when that version has any in the season.
+   */
+  const seasonList = useMemo(() => {
+    if (episodeIndex?.size) return [...episodeIndex.keys()].sort((a, b) => a - b);
+    return Array.from({ length: seasons }, (_, i) => i + 1);
+  }, [episodeIndex, seasons]);
+
+  const episodesOf = (target: number): number[] => {
+    const bySeason = episodeIndex?.get(target);
+    if (!bySeason) return episodeIndex?.size ? [] : Array.from({ length: 30 }, (_, i) => i + 1);
+    const wanted = lang === "vo" ? ["vo", "vostfr"] : [lang];
+    const all = [...bySeason.keys()].sort((a, b) => a - b);
+    const inLang = all.filter((value) => {
+      const versions = bySeason.get(value);
+      return !versions?.size || wanted.some((version) => versions.has(version));
+    });
+    return inLang.length ? inLang : all;
+  };
+  const episodeList = episodesOf(season);
+
+  /** The episode after this one: next in the season, else the next season's first. */
+  const nextEpisode = useMemo(() => {
+    if (subject.type !== "series") return null;
+    const later = episodeList.find((value) => value > episode);
+    if (later) return { season, episode: later };
+    const nextSeason = seasonList.find((value) => value > season);
+    if (!nextSeason) return episodeIndex?.size ? null : { season, episode: episode + 1 };
+    const first = episodesOf(nextSeason)[0];
+    return first ? { season: nextSeason, episode: first } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episode, episodeIndex, episodeList.join(","), lang, season, seasonList, subject.type]);
+
+  // Keep the choice on something that exists once the real list is known (or
+  // after a language switch): a resumed S2E5 stays, a phantom E24 does not.
+  useEffect(() => {
+    if (!episodeIndex?.size || subject.type !== "series") return;
+    if (!seasonList.includes(season)) {
+      setSeason(seasonList[0]);
+      return;
+    }
+    if (episodeList.length && !episodeList.includes(episode)) setEpisode(episodeList[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episodeIndex, season, episode, lang]);
+
+  const goNext = () => {
+    if (!nextEpisode) return;
+    setSeason(nextEpisode.season);
+    setEpisode(nextEpisode.episode);
+  };
   const currentSeason = asSeasons[season - 1];
   const src = isSama
     ? animeSamaPlayerUrl({
@@ -1386,6 +1460,31 @@ export default function PlayerModal({
             </div>
           </div>
         ) : null}
+        {/* « Épisode suivant » sur l'image : il apparaît avec les commandes
+            (souris qui bouge, doigt qui touche l'écran) et reste affiché sur
+            la dernière minute et le générique de fin. */}
+        {subject.type === "series" && nextEpisode && ((source && !sourceFail) || isSama) ? (
+          <button
+            type="button"
+            className={`mf-player__next${
+              isSama ||
+              awake ||
+              !play.playing ||
+              (play.duration > 0 && play.duration - play.current < 90)
+                ? " is-visible"
+                : ""
+            }${play.duration > 0 && play.duration - play.current < 90 ? " is-ending" : ""}`}
+            onClick={goNext}
+          >
+            <SkipForward size={18} />
+            <span>
+              Épisode suivant
+              <small>
+                S{nextEpisode.season} · É{nextEpisode.episode}
+              </small>
+            </span>
+          </button>
+        ) : null}
         {castMenu && source && !sourceFail ? (
           <div className="mf-castmenu" role="dialog" aria-label="Caster sur la télévision">
             <button
@@ -1517,59 +1616,43 @@ export default function PlayerModal({
       </div>
 
       <footer className="mf-play__bar">
+        {/* Same drawn menus as the header filters: the native pickers drew a
+            grey Windows list with a blue bar over the film. */}
         {subject.type === "series" && (
-          <label className="mf-select">
-            <span>Saison</span>
-            <select
-              value={season}
-              onChange={(event) => {
-                setSeason(Number(event.target.value));
+          <div className="mf-play__pick">
+            <Dropdown
+              label="Saison"
+              value={String(season)}
+              options={seasonList.map((value) => ({ value: String(value), label: `Saison ${value}` }))}
+              onChange={(value) => {
+                const next = Number(value);
+                setSeason(next);
+                setEpisode(episodesOf(next)[0] ?? 1);
               }}
-            >
-              {Array.from({ length: seasons }, (_, i) => i + 1).map((value) => (
-                <option key={value} value={value}>
-                  Saison {value}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
         )}
         {subject.type === "series" && (
-          <label className="mf-select">
-            <span>Épisode</span>
-            <select
-              value={episode}
-              onChange={(event) => {
-                setEpisode(Number(event.target.value));
-              }}
-            >
-              {Array.from({ length: 30 }, (_, i) => i + 1).map((value) => (
-                <option key={value} value={value}>
-                  Épisode {value}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="mf-play__pick">
+            <Dropdown
+              label="Épisode"
+              value={String(episode)}
+              options={episodeList.map((value) => ({ value: String(value), label: `Épisode ${value}` }))}
+              onChange={(value) => setEpisode(Number(value))}
+            />
+          </div>
         )}
-        <label className="mf-select">
-          <span>Langue</span>
-          <select value={lang} onChange={(event) => setLang(event.target.value as MoviezLang)}>
-            {languages.map((value) => (
-              <option key={value} value={value}>
-                {LANG_LABEL[value] ?? value.toUpperCase()}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="mf-play__pick">
+          <Dropdown
+            label="Langue"
+            value={lang}
+            options={languages.map((value) => ({ value, label: LANG_LABEL[value] ?? value.toUpperCase() }))}
+            onChange={(value) => setLang(value as MoviezLang)}
+          />
+        </div>
 
-        {subject.type === "series" ? (
-          <button
-            type="button"
-            className="mf-btn mf-play__next"
-            onClick={() => {
-              setEpisode((value) => value + 1);
-            }}
-          >
+        {subject.type === "series" && nextEpisode ? (
+          <button type="button" className="mf-btn mf-play__next" onClick={goNext}>
             <SkipForward size={16} /> Épisode suivant
           </button>
         ) : null}
