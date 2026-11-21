@@ -258,18 +258,9 @@ export default function App() {
     const timer = window.setTimeout(() => runSync.current(), 2500);
     return () => window.clearTimeout(timer);
   }, [library, synced]);
-  // A profile signed in before the sync existed lives only on this device:
-  // it is signed out once so the next sign-in puts it online (same name, same
-  // password, its history comes along).
-  useEffect(() => {
-    if (cloudEnabled() && profile && profile.password.hash) {
-      signOut();
-      setProfile(null);
-      setLibrary(readLibrary(LOCAL_PROFILE_ID));
-      setAuthOpen(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // A profile created before the sync existed stays signed in on its device,
+  // unsynced and unbothered: signing in again whenever the viewer likes puts
+  // it online with its history. Nobody is ever forced into the sign-in form.
   const [catalog, setCatalog] = useState<Title[]>([]);
   const sagas = useMemo(
     () => (sagaSources && catalog.length ? buildSagas(sagaSources, catalog) : null),

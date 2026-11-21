@@ -23,6 +23,8 @@ import {
   NoStreamError,
   PLAYER_PROXY,
   loadEpisodes,
+  loadAudio,
+  languageName,
   type EpisodeIndex,
   animeSamaInfoUrl,
   animeSamaPlayerUrl,
@@ -133,6 +135,14 @@ export default function PlayerModal({
   const [status, setStatus] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
   const [live, setLive] = useState<{ seasons?: number; languages?: string[] }>({});
   const [asSeasons, setAsSeasons] = useState<{ saison: string; versions: string[] }[]>([]);
+  /** Audio Moviez detected in each file ("s:e" or "0:0" → ["en","fr"]). */
+  const [audioMap, setAudioMap] = useState<Map<string, string[]>>(new Map());
+  /** Qualities the stream offers (heights), and the one picked (-1 = auto). */
+  const [levels, setLevels] = useState<number[]>([]);
+  const [level, setLevel] = useState(-1);
+  const hlsRef = useRef<{ currentLevel: number } | null>(null);
+  /** Real real-world height of the picture, shown on the quality button. */
+  const [height, setHeight] = useState(0);
   /** Real episode list from Moviez (series only); null until it answers. */
   const [episodeIndex, setEpisodeIndex] = useState<EpisodeIndex | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -270,6 +280,18 @@ export default function PlayerModal({
   }, [isSama, subject.id, subject.slug]);
 
   useEffect(() => {
+    setAudioMap(new Map());
+    if (isSama) return;
+    let alive = true;
+    loadAudio(subject.id, subject.type).then((map) => {
+      if (alive) setAudioMap(map);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isSama, subject.id, subject.type]);
+
+  useEffect(() => {
     setEpisodeIndex(null);
     if (subject.type !== "series" || isSama) return;
     let alive = true;
@@ -387,6 +409,27 @@ export default function PlayerModal({
     if (ios || isSama || !source) return;
     void prepareCast();
   }, [ios, isSama, source]);
+
+  // The picture's real height, for the quality button ("720p").
+  useEffect(() => {
+    const video = videoRef.current;
+    setHeight(0);
+    if (!video) return;
+    const read = () => setHeight(video.videoHeight || 0);
+    video.addEventListener("loadedmetadata", read);
+    video.addEventListener("resize", read);
+    return () => {
+      video.removeEventListener("loadedmetadata", read);
+      video.removeEventListener("resize", read);
+    };
+  }, [source]);
+
+  const [qualityOpen, setQualityOpen] = useState(false);
+  const pickLevel = (index: number) => {
+    if (hlsRef.current) hlsRef.current.currentLevel = index;
+    setLevel(index);
+    setQualityOpen(false);
+  };
 
   useEffect(
     () =>
@@ -507,7 +550,17 @@ export default function PlayerModal({
           }
           setSourceFail(true);
         });
-        stop = () => hls.destroy();
+        hlsRef.current = hls;
+        hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+          const heights = (data.levels ?? []).map((entry: { height?: number }) => entry.height ?? 0);
+          setLevels(heights.filter((value: number) => value > 0).length > 1 ? heights : []);
+          setLevel(-1);
+        });
+        stop = () => {
+          hlsRef.current = null;
+          setLevels([]);
+          hls.destroy();
+        };
       })
       .catch(() => {
         if (alive) setSourceFail(true);
@@ -971,6 +1024,32 @@ export default function PlayerModal({
     return list.length ? list : ([preferredLang(isAnime)] as MoviezLang[]);
   }, [asSeasons, isAnime, isSama, live.languages, season, subject.languages]);
 
+  /**
+   * The language as the file really is. Moviez labels most files "VF"; the
+   * audio it detected in the file decides here, so an English-only file reads
+   * « VO (anglais) » instead of a French label that lies.
+   */
+  const audio = audioMap.get(subject.type === "series" ? `${season}:${episode}` : "0:0") ?? null;
+  const langLabel = (value: string): string => {
+    const base = LANG_LABEL[value] ?? value.toUpperCase();
+    if (!audio || isAnime) return base;
+    const french = audio.includes("fr");
+    const others = audio.filter((code) => code !== "fr");
+    if ((value === "vf" || value === "multi") && !french) {
+      return others.length ? `VO (${others.map(languageName).join(", ")})` : "VO";
+    }
+    if (value === "multi" && french && !others.length) return "VF";
+    return base;
+  };
+  const languageOptions = (() => {
+    const seen = new Set<string>();
+    const ordered = [lang, ...languages.filter((value) => value !== lang)];
+    const options = ordered
+      .map((value) => ({ value, label: langLabel(value) }))
+      .filter((option) => (seen.has(option.label) ? false : (seen.add(option.label), true)));
+    return options.sort((a, b) => languages.indexOf(a.value as MoviezLang) - languages.indexOf(b.value as MoviezLang));
+  })();
+
   const seasonCount = isSama ? asSeasons.length || 1 : live.seasons ?? subject.seasons ?? 1;
   const seasons = Math.max(1, Math.min(seasonCount || 1, 60));
 
@@ -1262,7 +1341,7 @@ export default function PlayerModal({
             <span className="mf-play__live" aria-hidden="true" />
             {subject.type === "series" ? `Saison ${season} · Épisode ${episode}` : "Film complet"}
             <span className="mf-dot" />
-            {LANG_LABEL[lang] ?? lang.toUpperCase()}
+            {langLabel(lang)}
           </p>
         </div>
 
@@ -1443,6 +1522,53 @@ export default function PlayerModal({
                   />
                 )}
               </div>
+              {height || levels.length > 1 ? (
+                <div className="mf-quality">
+                  <button
+                    type="button"
+                    className="mf-quality__btn"
+                    onClick={() => levels.length > 1 && setQualityOpen((value) => !value)}
+                    aria-haspopup={levels.length > 1 ? "menu" : undefined}
+                    aria-expanded={levels.length > 1 ? qualityOpen : undefined}
+                    title={
+                      levels.length > 1
+                        ? "Choisir la qualité"
+                        : "Qualité du fichier : la source n'en propose qu'une pour ce titre"
+                    }
+                  >
+                    {level >= 0 && levels[level] ? `${levels[level]}p` : height ? `${height}p` : "Auto"}
+                    {levels.length > 1 && level < 0 ? <small>AUTO</small> : null}
+                  </button>
+                  {qualityOpen && levels.length > 1 ? (
+                    <div className="mf-quality__menu" role="menu">
+                      {levels
+                        .map((value, index) => ({ value, index }))
+                        .sort((a, b) => b.value - a.value)
+                        .map(({ value, index }) => (
+                          <button
+                            key={index}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={level === index}
+                            className={level === index ? "is-on" : ""}
+                            onClick={() => pickLevel(index)}
+                          >
+                            {value}p{value >= 1080 ? <small>HD</small> : value >= 720 ? <small>HD</small> : null}
+                          </button>
+                        ))}
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={level < 0}
+                        className={level < 0 ? "is-on" : ""}
+                        onClick={() => pickLevel(-1)}
+                      >
+                        Auto
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <button
                 type="button"
                 className={`mf-skin__btn mf-skin__btn--cast${castDevice ? " is-on" : ""}`}
@@ -1652,7 +1778,7 @@ export default function PlayerModal({
           <Dropdown
             label="Langue"
             value={lang}
-            options={languages.map((value) => ({ value, label: LANG_LABEL[value] ?? value.toUpperCase() }))}
+            options={languageOptions}
             onChange={(value) => setLang(value as MoviezLang)}
           />
         </div>

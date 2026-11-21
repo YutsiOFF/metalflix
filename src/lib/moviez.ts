@@ -180,3 +180,62 @@ export function loadEpisodes(tmdbId: number): Promise<EpisodeIndex> {
   episodeCache.set(tmdbId, job);
   return job;
 }
+
+/**
+ * What the file really speaks. `/api/check` advertises VF for nearly every
+ * title, but each file row carries the audio Moviez actually detected in it
+ * (`langs`: "fr", "en", "en,fr"…; empty when not detected). Key: "s:e" for an
+ * episode, "0:0" for a film. Empty map when the API does not answer.
+ */
+const audioCache = new Map<string, Promise<Map<string, string[]>>>();
+
+export function loadAudio(tmdbId: number, type: "movie" | "series"): Promise<Map<string, string[]>> {
+  const cacheKey = `${type}:${tmdbId}`;
+  const known = audioCache.get(cacheKey);
+  if (known) return known;
+  const url = type === "movie" ? `${API_BASE}/api/movie/${tmdbId}` : `${API_BASE}/api/serie/${tmdbId}`;
+  const job = fetch(url, { headers: { accept: "application/json" } })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data: unknown) => {
+      const rows = (
+        type === "movie" ? [data] : ((data as { episodes?: unknown[] } | null)?.episodes ?? [])
+      ) as { season?: number; episode?: number; langs?: string; lang_checked?: number; status?: string }[];
+      const audio = new Map<string, string[]>();
+      for (const row of rows) {
+        if (!row || !row.lang_checked || (row.status && row.status !== "ready")) continue;
+        const langs = String(row.langs ?? "")
+          .split(",")
+          .map((value) => value.trim().toLowerCase())
+          .filter(Boolean);
+        if (!langs.length) continue;
+        const key = type === "movie" ? "0:0" : `${Number(row.season)}:${Number(row.episode)}`;
+        const merged = new Set([...(audio.get(key) ?? []), ...langs]);
+        audio.set(key, [...merged]);
+      }
+      return audio;
+    })
+    .catch(() => new Map<string, string[]>());
+  audioCache.set(cacheKey, job);
+  return job;
+}
+
+const LANGUAGE_NAME: Record<string, string> = {
+  en: "anglais",
+  fr: "français",
+  ja: "japonais",
+  ko: "coréen",
+  es: "espagnol",
+  de: "allemand",
+  it: "italien",
+  pt: "portugais",
+  zh: "chinois",
+  hi: "hindi",
+  ar: "arabe",
+  ru: "russe",
+  tr: "turc",
+  th: "thaï",
+};
+
+export function languageName(code: string): string {
+  return LANGUAGE_NAME[code] ?? code.toUpperCase();
+}

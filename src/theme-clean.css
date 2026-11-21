@@ -2050,3 +2050,91 @@ body {
     height: 13rem;
   }
 }
+
+/* --------------------------- qualité vidéo ---------------------------- */
+
+.mf-quality {
+  position: relative;
+  order: 6;
+  margin-left: auto;
+}
+
+.mf-quality + .mf-skin__btn--cast {
+  margin-left: 0;
+}
+
+.mf-quality__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 2rem;
+  padding: 0 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-family: var(--mf-font);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mf-quality__btn small {
+  padding: 0.05rem 0.25rem;
+  border-radius: 3px;
+  background: var(--mf-accent);
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+}
+
+.mf-quality__btn:hover {
+  border-color: #fff;
+}
+
+.mf-quality__menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.5rem);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  min-width: 8.5rem;
+  padding: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(20, 20, 24, 0.98);
+  box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.6);
+}
+
+.mf-quality__menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--mf-text-2);
+  font-family: var(--mf-font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mf-quality__menu button small {
+  color: var(--mf-accent);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.mf-quality__menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.mf-quality__menu button.is-on {
+  background: rgba(229, 9, 20, 0.16);
+  color: #fff;
+}
