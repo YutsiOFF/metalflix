@@ -166,6 +166,9 @@ export default function PlayerModal({
   const ios = useMemo(isIOS, []);
   /** Name of the television playing this title, null when nothing is cast. */
   const [castDevice, setCastDevice] = useState<string | null>(null);
+  /** iPhone/iPad: the cast button opens a small choice (AirPlay or Chromecast). */
+  const [castMenu, setCastMenu] = useState(false);
+  const [castCopied, setCastCopied] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -814,7 +817,15 @@ export default function PlayerModal({
       return;
     }
 
-    // iPhone, iPad, Safari on Mac: the AirPlay list, on the playing element.
+    // iPhone / iPad: Apple keeps Google Cast out of every iOS browser, so the
+    // button offers both routes — AirPlay here, Chromecast through VLC.
+    if (ios) {
+      setCastCopied(false);
+      setCastMenu(true);
+      return;
+    }
+
+    // Safari on Mac: the AirPlay list, on the playing element.
     if (typeof video.webkitShowPlaybackTargetPicker === "function") {
       try {
         video.webkitShowPlaybackTargetPicker();
@@ -825,6 +836,36 @@ export default function PlayerModal({
     }
     // Any other browser that implements the Remote Playback API.
     video.remote?.prompt?.().catch(() => {});
+  };
+
+  /** iOS → AirPlay picker (Apple TV, AirPlay TVs). */
+  const openAirPlay = () => {
+    setCastMenu(false);
+    const video = videoRef.current as (HTMLVideoElement & { webkitShowPlaybackTargetPicker?: () => void }) | null;
+    try {
+      video?.webkitShowPlaybackTargetPicker?.();
+    } catch {
+      // No AirPlay on this device.
+    }
+  };
+
+  /**
+   * iOS → Chromecast. No iOS browser can talk to a Chromecast, but VLC can:
+   * it opens the relayed stream and its cast button sends it to the TV.
+   */
+  const vlcLink = castUrl
+    ? `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(castUrl)}&x-success=${encodeURIComponent(
+        typeof window !== "undefined" ? window.location.href : "",
+      )}`
+    : "";
+
+  const copyStream = async () => {
+    try {
+      await navigator.clipboard.writeText(castUrl);
+      setCastCopied(true);
+    } catch {
+      window.prompt("Lien du flux à coller dans une app de cast :", castUrl);
+    }
   };
 
   /** "2:07" or "1:42:58" — the sheet already prints durations this way. */
@@ -1316,6 +1357,50 @@ export default function PlayerModal({
                 </button>
               ) : null}
             </div>
+          </div>
+        ) : null}
+        {castMenu && source && !sourceFail ? (
+          <div className="mf-castmenu" role="dialog" aria-label="Caster sur la télévision">
+            <button
+              type="button"
+              className="mf-castmenu__close"
+              onClick={() => setCastMenu(false)}
+              aria-label="Fermer"
+            >
+              <X size={18} />
+            </button>
+            <h3>Caster sur la télé</h3>
+            <button type="button" className="mf-castmenu__opt" onClick={openAirPlay}>
+              <Cast size={22} />
+              <span>
+                <strong>AirPlay</strong>
+                <small>Apple TV, télé Samsung / LG / Sony compatibles</small>
+              </span>
+            </button>
+            <a
+              className="mf-castmenu__opt"
+              href={vlcLink}
+              onClick={() => {
+                videoRef.current?.pause();
+                setCastMenu(false);
+              }}
+            >
+              <Cast size={22} />
+              <span>
+                <strong>Chromecast</strong>
+                <small>S'ouvre dans VLC : touche l'icône cast en haut, choisis ta Chromecast</small>
+              </span>
+            </a>
+            <p className="mf-castmenu__note">
+              Pas encore VLC ?{" "}
+              <a href="https://apps.apple.com/app/vlc-media-player/id650377962" target="_blank" rel="noreferrer">
+                L'installer (gratuit)
+              </a>{" "}
+              ·{" "}
+              <button type="button" onClick={copyStream}>
+                {castCopied ? "Lien copié ✓" : "Copier le lien du flux"}
+              </button>
+            </p>
           </div>
         ) : null}
         {castDevice && source && !sourceFail ? (
