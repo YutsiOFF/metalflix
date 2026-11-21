@@ -23,6 +23,8 @@ interface RailProps {
  */
 export default function Rail({ head, icon, total, items, large = false, onOpen, wantedIds, onToggleWatch, onSeeAll }: RailProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  /** The arrow glide in flight, if any (see page()). */
+  const glide = useRef<{ frame: number; target: number } | null>(null);
   const frame = useRef(0);
   const [edges, setEdges] = useState({ prev: false, next: false });
 
@@ -80,13 +82,36 @@ export default function Rail({ head, icon, total, items, large = false, onOpen, 
 
   if (!items.length) return null;
 
+  /**
+   * One screen to the side, as a glide. The browser's own smooth scroll could
+   * be starved by poster decoding and then jumped; this drives scrollLeft
+   * frame by frame with an ease-out, and a second click mid-glide simply
+   * extends the target instead of restarting from a jolt.
+   */
   function page(direction: -1 | 1) {
     const el = trackRef.current;
     if (!el) return;
-    // Instant rather than smooth: an animated scroll can be starved by the
-    // poster rendering and then look like the arrow does nothing.
-    el.scrollTo({ left: el.scrollLeft + direction * el.clientWidth * 0.82, behavior: "instant" });
-    updateEdges();
+    const max = el.scrollWidth - el.clientWidth;
+    const base = glide.current ? glide.current.target : el.scrollLeft;
+    const target = Math.max(0, Math.min(max, base + direction * el.clientWidth * 0.82));
+    if (glide.current) cancelAnimationFrame(glide.current.frame);
+
+    const from = el.scrollLeft;
+    const distance = target - from;
+    const duration = 520;
+    const started = performance.now();
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+    const step = (now: number) => {
+      const t = Math.min(1, (now - started) / duration);
+      el.scrollLeft = from + distance * ease(t);
+      if (t < 1) {
+        glide.current = { frame: requestAnimationFrame(step), target };
+      } else {
+        glide.current = null;
+        updateEdges();
+      }
+    };
+    glide.current = { frame: requestAnimationFrame(step), target };
   }
 
   return (

@@ -40,6 +40,7 @@ function sized(url: string, width: "w1280" | "w780"): string {
 export default function TopRail({ items, onOpen, title = "Top 10 des films aujourd'hui", series = false }: TopRailProps) {
   const [stills, setStills] = useState<Record<string, string>>({});
   const trackRef = useRef<HTMLOListElement>(null);
+  const glide = useRef<{ frame: number; target: number } | null>(null);
   const [edges, setEdges] = useState({ prev: false, next: false });
 
   /** Shows an arrow only while there is something to scroll to on that side. */
@@ -62,10 +63,27 @@ export default function TopRail({ items, onOpen, title = "Top 10 des films aujou
     return () => observer.disconnect();
   }, [items]);
 
+  // Same frame-by-frame glide as Rail: smooth even while stills decode.
   function page(direction: -1 | 1) {
     const el = trackRef.current;
     if (!el) return;
-    el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
+    const max = el.scrollWidth - el.clientWidth;
+    const base = glide.current ? glide.current.target : el.scrollLeft;
+    const target = Math.max(0, Math.min(max, base + direction * el.clientWidth * 0.8));
+    if (glide.current) cancelAnimationFrame(glide.current.frame);
+    const from = el.scrollLeft;
+    const distance = target - from;
+    const started = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - started) / 560);
+      el.scrollLeft = from + distance * (1 - Math.pow(1 - t, 3));
+      if (t < 1) glide.current = { frame: requestAnimationFrame(step), target };
+      else {
+        glide.current = null;
+        updateEdges();
+      }
+    };
+    glide.current = { frame: requestAnimationFrame(step), target };
   }
 
   useEffect(() => {

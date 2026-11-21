@@ -863,3 +863,288 @@ body {
 .mf-resume__card {
   border-radius: var(--mf-radius);
 }
+
+/* ------------------------------ grilles ------------------------------ */
+
+/* La grille de résultats remplit toute la largeur : plus de trou à droite
+   quand la dernière carte ne tombe pas pile au bord. */
+.mf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(6.6rem, 15vw, 13rem), 1fr));
+  gap: 2rem 0.75rem;
+}
+
+.mf-grid > * {
+  flex: none;
+}
+
+.mf-grid .mf-card {
+  width: auto;
+}
+
+/* L'aimantation du défilement contrariait la glissade des flèches. */
+.mf-top__track,
+.mf-studios__track {
+  scroll-snap-type: none;
+}
+
+/* ------------------------------- lecteur ----------------------------- */
+
+/* Une salle noire : le panneau prend presque tout l'écran, sans cadre. */
+.mf-modal__panel--play {
+  width: min(92rem, 100%);
+  border: 0;
+  border-radius: 16px;
+  background: #000;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+}
+
+.mf-play__head {
+  gap: 1rem;
+  padding: 1rem 1.25rem 0.9rem;
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  border-bottom: 0;
+  background: #000;
+}
+
+.mf-play__back {
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mf-play__eyebrow {
+  color: var(--mf-accent);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+}
+
+.mf-play__title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Les outils deviennent des pastilles rondes à icône (le libellé reste en
+   info-bulle et pour les lecteurs d'écran). */
+.mf-play__tools {
+  gap: 0.45rem;
+}
+
+.mf-play__tool {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.mf-play__tool span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.mf-play__tool:hover {
+  border: 0;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.mf-play__tool.is-on {
+  background: #fff;
+  color: #000;
+}
+
+.mf-play__tool--close:hover {
+  background: var(--mf-accent);
+}
+
+.mf-play .mf-player {
+  max-height: min(74vh, calc(100vh - 11rem));
+  box-shadow: none;
+}
+
+/* Barre de lecture façon plateforme : la progression sur toute la largeur,
+   les commandes en dessous, temps à gauche, cast et plein écran à droite. */
+.mf-skin__bar {
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+  column-gap: 0.35rem;
+  padding: 3.5rem 1.25rem 1rem;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.55) 55%, rgba(0, 0, 0, 0) 100%);
+}
+
+.mf-skin__range {
+  order: -1;
+  flex: 1 1 100%;
+  height: 1.1rem;
+}
+
+.mf-skin__range::-webkit-slider-runnable-track {
+  height: 0.25rem;
+  transition: height 0.15s;
+}
+
+.mf-skin__range:hover::-webkit-slider-runnable-track {
+  height: 0.4rem;
+}
+
+.mf-skin__btn {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.mf-skin__btn--play {
+  order: 1;
+  width: 2.75rem;
+  height: 2.75rem;
+  background: transparent;
+}
+
+.mf-skin__btn--play:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.mf-skin__btn--play svg {
+  width: 24px;
+  height: 24px;
+}
+
+.mf-skin__skips {
+  order: 2;
+}
+
+.mf-skin__vol {
+  order: 3;
+}
+
+.mf-skin__time {
+  order: 4;
+  margin-left: 0.5rem;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.mf-skin__time--total {
+  order: 5;
+  margin-left: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.mf-skin__time--total::before {
+  content: "/ ";
+}
+
+.mf-skin__btn--cast {
+  order: 6;
+  margin-left: auto;
+}
+
+.mf-skin__btn--cast.is-on {
+  background: var(--mf-accent);
+}
+
+.mf-skin__btn--fs {
+  order: 7;
+}
+
+/* Le film part sur la télé : le cadre le dit, avec de quoi le reprendre ici. */
+.mf-player__casting {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  background: radial-gradient(60% 60% at 50% 45%, rgba(229, 9, 20, 0.16), transparent 70%), rgba(0, 0, 0, 0.88);
+  color: #fff;
+  text-align: center;
+}
+
+.mf-player__casting svg {
+  color: var(--mf-accent);
+}
+
+.mf-player__casting p {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.mf-player__casting strong {
+  font-weight: 800;
+}
+
+/* Saison, épisode, langue : des pastilles sombres, sans bordure. */
+.mf-play__bar {
+  gap: 0.6rem;
+  padding: 0.9rem 1.25rem;
+  padding-bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px));
+  border-top: 0;
+  background: #000;
+}
+
+.mf-play .mf-select {
+  height: 2.5rem;
+  padding: 0 0.6rem 0 0.9rem;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mf-play .mf-select:focus-within {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.mf-play .mf-select > span {
+  color: var(--mf-text-3);
+  font-size: 0.62rem;
+}
+
+.mf-play .mf-select select {
+  font-weight: 600;
+}
+
+.mf-play__next {
+  height: 2.5rem;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+}
+
+.mf-play__next:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.mf-play__hint {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mf-modal__panel--play {
+    border-radius: 0;
+  }
+
+  .mf-skin__bar {
+    padding: 2.5rem 0.75rem 0.6rem;
+  }
+
+  .mf-skin__time {
+    font-size: 0.72rem;
+  }
+
+  .mf-play__tool {
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+}

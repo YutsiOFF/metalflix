@@ -33,10 +33,11 @@ import {
   castReady,
   castStream,
   isCasting,
-  openCastPicker,
+  onCastChange,
   setCastMuted,
   setCastVolume,
   prepareCast,
+  stopCasting,
 } from "../lib/cast";
 import { loadDetails, type TitleDetails } from "../lib/details";
 import { loadBackdrops } from "../lib/artwork";
@@ -163,6 +164,8 @@ export default function PlayerModal({
   const [awake, setAwake] = useState(true);
   const sleepRef = useRef<number | null>(null);
   const ios = useMemo(isIOS, []);
+  /** Name of the television playing this title, null when nothing is cast. */
+  const [castDevice, setCastDevice] = useState<string | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -356,6 +359,54 @@ export default function PlayerModal({
     if (ios || isSama || !source) return;
     void prepareCast();
   }, [ios, isSama, source]);
+
+  useEffect(
+    () =>
+      onCastChange((device) => {
+        setCastDevice(device);
+        if (device) videoRef.current?.pause();
+      }),
+    [],
+  );
+
+  /**
+   * The URL a television is given: the same playlist, through our Worker. A TV
+   * (Chromecast receiver, Apple TV) asks the CDN from its own origin and
+   * without our Referer, which the host answers with a refusal or its promo
+   * reel; the Worker asks with Moviez's headers and adds open CORS.
+   */
+  const castUrl = source
+    ? PLAYER_PROXY
+      ? `${PLAYER_PROXY}/hls?u=${encodeURIComponent(source.hls)}`
+      : source.hls
+    : "";
+
+  // AirPlay (Safari): when the picture leaves for an Apple TV, swap the element
+  // onto the relayed URL at the same second, for the same reason as above.
+  useEffect(() => {
+    const video = videoRef.current as
+      | (HTMLVideoElement & { webkitCurrentPlaybackTargetIsWireless?: boolean })
+      | null;
+    if (!video || !castUrl || !PLAYER_PROXY) return;
+    const onTarget = () => {
+      if (!video.webkitCurrentPlaybackTargetIsWireless) return;
+      if (!video.src || video.src === castUrl || video.src.startsWith("blob:")) return;
+      const at = video.currentTime;
+      video.src = castUrl;
+      const resume = () => {
+        video.removeEventListener("loadedmetadata", resume);
+        try {
+          video.currentTime = at;
+        } catch {
+          // Not seekable yet: the TV starts at the beginning.
+        }
+        video.play().catch(() => {});
+      };
+      video.addEventListener("loadedmetadata", resume);
+    };
+    video.addEventListener("webkitcurrentplaybacktargetiswirelesschanged", onTarget);
+    return () => video.removeEventListener("webkitcurrentplaybacktargetiswirelesschanged", onTarget);
+  }, [castUrl]);
 
   /** Safari plays HLS itself; every other browser gets hls.js feeding the same
    *  video element, so the player and its controls are ours on every platform. */
@@ -728,49 +779,52 @@ export default function PlayerModal({
    * Android TV devices. When neither is available — a browser with no device,
    * or a Firefox — the sheet explains the app route instead of a dead button.
    */
-  const startCast = async () => {
+  const startCast = () => {
     const video = videoRef.current as (HTMLVideoElement & {
       webkitShowPlaybackTargetPicker?: () => void;
-      webkitWirelessVideoPlaybackDisabled?: boolean;
+      remote?: { prompt?: () => Promise<void> };
     }) | null;
-    if (!video) return;
+    if (!video || !source) return;
 
-    // Android and desktop Chrome: the Cast SDK, with the signed playlist. The
-    // Remote Playback API below can never work with hls.js, whose MediaSource
-    // leaves Chrome without a URL to send to the television. The call opens the
-    // device list, so it has to happen inside this click, without awaiting.
-    if (!ios && source && castReady()) {
-      // Moviez's own subtitle endpoint, so an anime does not land on the TV
-      // without its subtitles.
+    // Already on a TV: the same button stops it and the film carries on here.
+    if (castDevice) {
+      const at = video.currentTime;
+      stopCasting();
+      setCastDevice(null);
+      video.currentTime = at;
+      video.play().catch(() => setBlocked(true));
+      return;
+    }
+
+    // Chrome / Edge (computer) and Chrome on Android: Google Cast. The call
+    // opens the device list right away, inside this click.
+    if (!ios && castReady()) {
       const subtitles =
         subject.type === "series"
           ? `${API_BASE}/vtt/${subject.id}?lang=fr&s=${season}&e=${episode}`
           : `${API_BASE}/vtt/${subject.id}?lang=fr`;
-      let cast = await castStream(source.hls, {
-        title: `${subject.title} — MetalFlix`,
-        poster: subject.poster ?? undefined,
+      void castStream(castUrl, {
+        title: subject.type === "series" ? `${subject.title} — S${season} É${episode}` : subject.title,
+        poster: still || subject.poster || undefined,
         startAt: video.currentTime,
-        subtitles,
-      }).catch(() => false);
-      // castjs can bail before the browser ever shows its list: ask the
-      // framework itself once more, the picker is the same.
-      if (!cast) cast = await openCastPicker().catch(() => false);
-      if (cast) {
-        video.pause();
-        return;
-      }
+        subtitles: lang === "vostfr" || isAnime ? subtitles : undefined,
+      }).then((ok) => {
+        if (ok) video.pause();
+      });
+      return;
     }
 
-    // iPhone: Safari's own AirPlay picker, on the element that is playing.
-    try {
-      video.setAttribute("x-webkit-airplay", "allow");
-      if ("webkitWirelessVideoPlaybackDisabled" in video) video.webkitWirelessVideoPlaybackDisabled = false;
-      if (typeof video.webkitShowPlaybackTargetPicker === "function") {
+    // iPhone, iPad, Safari on Mac: the AirPlay list, on the playing element.
+    if (typeof video.webkitShowPlaybackTargetPicker === "function") {
+      try {
         video.webkitShowPlaybackTargetPicker();
+        return;
+      } catch {
+        // Fall through to the standard API.
       }
-    } catch {
-      // No picker on this browser: nothing more to offer.
     }
+    // Any other browser that implements the Remote Playback API.
+    video.remote?.prompt?.().catch(() => {});
   };
 
   /** "2:07" or "1:42:58" — the sheet already prints durations this way. */
@@ -1065,17 +1119,6 @@ export default function PlayerModal({
         </div>
 
         <div className="mf-play__tools">
-          {ios ? (
-            <button
-              type="button"
-              className="mf-play__tool mf-play__tool--cast"
-              onClick={startCast}
-              title="Caster sur la télévision"
-            >
-              <Cast size={16} />
-              <span>Caster</span>
-            </button>
-          ) : null}
           {canFullscreen ? (
             <button
               type="button"
@@ -1161,6 +1204,7 @@ export default function PlayerModal({
             autoPlay
             preload="metadata"
             crossOrigin="anonymous"
+            x-webkit-airplay="allow"
             title={`Lecteur ${subject.title}`}
             onClick={onSurface}
             onPlay={() => setBlocked(false)}
@@ -1253,17 +1297,17 @@ export default function PlayerModal({
               </div>
               <button
                 type="button"
-                className="mf-skin__btn"
+                className={`mf-skin__btn mf-skin__btn--cast${castDevice ? " is-on" : ""}`}
                 onClick={startCast}
-                aria-label="Caster sur la télévision"
-                title="Caster sur la télévision"
+                aria-label={castDevice ? `Arrêter la lecture sur ${castDevice}` : "Caster sur la télévision"}
+                title={castDevice ? `Arrêter la lecture sur ${castDevice}` : "Caster sur la télévision (Chromecast, AirPlay)"}
               >
                 <Cast size={17} />
               </button>
               {canFullscreen ? (
                 <button
                   type="button"
-                  className="mf-skin__btn"
+                  className="mf-skin__btn mf-skin__btn--fs"
                   onClick={toggleFullscreen}
                   aria-label={fullscreen ? "Réduire" : "Plein écran"}
                   title={fullscreen ? "Réduire" : "Plein écran"}
@@ -1272,6 +1316,17 @@ export default function PlayerModal({
                 </button>
               ) : null}
             </div>
+          </div>
+        ) : null}
+        {castDevice && source && !sourceFail ? (
+          <div className="mf-player__casting" role="status">
+            <Cast size={34} strokeWidth={1.6} />
+            <p>
+              Lecture sur <strong>{castDevice}</strong>
+            </p>
+            <button type="button" className="mf-btn" onClick={startCast}>
+              Reprendre ici
+            </button>
           </div>
         ) : null}
         {blocked && source && !sourceFail ? (
