@@ -432,6 +432,8 @@ body {
 /* ------------------------------ toolbar ------------------------------ */
 
 .mf-toolbar {
+  /* Room for the sticky header when a studio tile scrolls down to here. */
+  scroll-margin-top: calc(var(--mf-nav-h) + env(safe-area-inset-top, 0px) + 0.5rem);
   padding-top: 0.5rem;
   padding-bottom: 1.25rem;
 }
@@ -450,6 +452,12 @@ body {
 
 .mf-count {
   font-size: 0.8rem;
+}
+
+@media (max-width: 1100px) {
+  .mf-toolbar {
+    scroll-margin-top: calc(var(--mf-nav-h) + env(safe-area-inset-top, 0px) + 3.5rem);
+  }
 }
 
 /* ------------------------------- cards ------------------------------- */

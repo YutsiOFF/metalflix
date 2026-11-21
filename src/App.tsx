@@ -134,6 +134,7 @@ export default function App() {
   const [genre, setGenre] = useState<GenreKey | "all">("all");
   const [year, setYear] = useState<number | "all">("all");
   const [platform, setPlatform] = useState<PlatformKey | "all">("all");
+  const scrollToResults = useRef(false);
   const [sort, setSort] = useState<Sort>("default");
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -392,18 +393,19 @@ export default function App() {
     if (fresh.length)
       rows.push({
         key: "fresh",
-        head: scope ? `Nouveautés · ${scope}` : "Nouveautés",
+        head: scope ? `Nouveautés ${scope}` : "Nouveautés",
         icon: <Flame size={16} />,
         items: fresh,
         large: true,
       });
 
+    const service = platform !== "all" ? PLATFORM_LABEL[platform] : "";
     for (const category of ["film", "serie", "anime"] as Category[]) {
       const items = pool.filter((item) => item.category === category).slice(0, 40);
       if (!items.length) continue;
       rows.push({
         key: `res-${category}`,
-        head: CATEGORY_LABEL[category],
+        head: service ? `${CATEGORY_LABEL[category]} ${service}` : CATEGORY_LABEL[category],
         icon: category === "film" ? <Film size={16} /> : category === "serie" ? <Tv size={16} /> : <Sparkles size={16} />,
         items,
         total: pool.filter((item) => item.category === category).length,
@@ -411,6 +413,17 @@ export default function App() {
     }
     return rows;
   }, [genre, platform, query, results, searchMode, year]);
+
+  // After a studio tile: once the filtered rows are on the page, glide down to
+  // them, the header's height kept clear (scroll-margin on .mf-toolbar).
+  useEffect(() => {
+    if (!scrollToResults.current) return;
+    scrollToResults.current = false;
+    const frame = requestAnimationFrame(() => {
+      document.querySelector(".mf-toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [platform]);
 
   function openTitle(item: Title, at?: { season: number; episode: number; progress?: number }) {
     setResume(at ? { id: item.id, ...at } : null);
@@ -734,7 +747,12 @@ export default function App() {
             <StudioRail
               counts={studioCounts}
               active={platform}
-              onPick={(key) => setPlatform((current) => (current === key ? "all" : key))}
+              onPick={(key) => {
+                const next = platform === key ? "all" : key;
+                setPlatform(next);
+                // Picking a service drops straight down to its titles.
+                if (next !== "all") scrollToResults.current = true;
+              }}
             />
 
             <TopRail items={topFilms} onOpen={openTitle} />
