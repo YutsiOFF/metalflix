@@ -145,8 +145,59 @@ export function buildSagas(sources: SagaSource[], catalog: Title[]): Saga[] {
     const inside = kept.some((other) => [...entry.ids].every((id) => other.ids.has(id)));
     if (!inside) kept.push(entry);
   }
-  return kept.sort((a, b) => a.rank - b.rank).map((entry) => entry.saga);
+  // The famous sagas open the page in a fixed order; after them, sagas with the
+  // most recognisable films (the catalogue head is the notable titles).
+  const priority = (name: string) => {
+    const key = name.toLowerCase();
+    const index = FEATURED.findIndex((word) => key.includes(word));
+    return index === -1 ? Number.POSITIVE_INFINITY : index;
+  };
+  return kept
+    .map((entry) => ({
+      entry,
+      first: priority(entry.saga.name),
+      known: entry.saga.films.filter((item) => (films.get(item.id)?.rank ?? Infinity) < NOTABLE_HEAD).length,
+    }))
+    .sort((a, b) => a.first - b.first || b.known - a.known || a.entry.rank - b.entry.rank)
+    .map(({ entry }) => entry.saga);
 }
+
+/** Sagas everybody knows, shown first in this order (matched inside the name). */
+const FEATURED = [
+  "fast and furious",
+  "star wars",
+  "harry potter",
+  "seigneur des anneaux",
+  "univers cinématographique marvel",
+  "avengers",
+  "jurassic",
+  "mission impossible",
+  "john wick",
+  "pirates des caraïbes",
+  "matrix",
+  "indiana jones",
+  "hunger games",
+  "spider-man",
+  "batman",
+  "transformers",
+  "toy story",
+  "shrek",
+  "rocky",
+  "terminator",
+  "alien",
+  "twilight",
+  "les bronzés",
+  "taxi",
+  "astérix",
+  "conjuring",
+  "scream",
+  "saw",
+  "destination finale",
+  "chucky",
+];
+
+/** The catalogue's first rows are the notable titles (build-catalog sorts them first). */
+const NOTABLE_HEAD = 8000;
 
 /** "3 h 26" from minutes. */
 export function sagaRuntime(minutes: number): string {

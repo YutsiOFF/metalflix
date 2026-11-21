@@ -6,6 +6,7 @@
 // L'URL du webhook est lue dans .discord-webhook (première ligne, jamais commité)
 // ou dans la variable d'environnement DISCORD_WEBHOOK. Elle n'est jamais affichée.
 import { readFileSync, existsSync } from "node:fs";
+import { basename } from "node:path";
 
 const payloadPath = process.argv[2] ?? "discord-update-2026-11-14.json";
 
@@ -39,11 +40,33 @@ payload.allowed_mentions = { parse: ["everyone"] };
 
 // Components V2 par webhook exige `with_components=true`, sinon Discord ne voit
 // aucun composant et répond 400 « Cannot send an empty message ».
-const response = await fetch(`${url}?wait=true&with_components=true`, {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify(payload),
-});
+// Images jointes : "files" liste des chemins locaux. Elles partent avec le
+// message (multipart) et les galeries les citent en `attachment://nom.jpg`.
+const files = Array.isArray(payload.files) ? payload.files : [];
+delete payload.files;
+
+let response;
+if (files.length) {
+  const missing = files.filter((file) => !existsSync(file));
+  if (missing.length) {
+    console.error(`Image introuvable : ${missing.join(", ")}`);
+    process.exit(1);
+  }
+  payload.attachments = files.map((file, id) => ({ id, filename: basename(file) }));
+  const form = new FormData();
+  form.append("payload_json", JSON.stringify(payload));
+  files.forEach((file, id) => {
+    const type = /\.png$/i.test(file) ? "image/png" : /\.gif$/i.test(file) ? "image/gif" : "image/jpeg";
+    form.append(`files[${id}]`, new Blob([readFileSync(file)], { type }), basename(file));
+  });
+  response = await fetch(`${url}?wait=true&with_components=true`, { method: "POST", body: form });
+} else {
+  response = await fetch(`${url}?wait=true&with_components=true`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
 
 const body = await response.text();
 if (!response.ok) {

@@ -1,0 +1,136 @@
+{
+  "files": [
+    "discord-assets/2026-11-21/banniere.gif",
+    "discord-assets/2026-11-21/accueil.jpg",
+    "discord-assets/2026-11-21/studios-top10.jpg",
+    "discord-assets/2026-11-21/sagas.jpg",
+    "discord-assets/2026-11-21/fiche-film.jpg",
+    "discord-assets/2026-11-21/lecteur.jpg"
+  ],
+  "components": [
+    {
+      "type": 17,
+      "accent_color": 15010068,
+      "components": [
+        {
+          "type": 12,
+          "items": [
+            {
+              "media": {
+                "url": "attachment://banniere.gif"
+              }
+            }
+          ]
+        },
+        {
+          "type": 10,
+          "content": "@everyone\n# 🎬 Amélioration globale du site\n**Mise à jour du 21/11/2026** — MetalFlix change de tête : nouveau design, nouvelles pages, et le cast depuis l'iPhone qui marche enfin.\n**[👉 Ouvrir MetalFlix](https://yutsioff.github.io/metalflix/)**"
+        },
+        {
+          "type": 14,
+          "spacing": 1,
+          "divider": true
+        },
+        {
+          "type": 10,
+          "content": "## 🆕 Les nouveautés\n### 🎨 Un tout nouveau design\n- Look **ultra clean** façon plateforme de streaming : police Montserrat, grandes images en fondu, plus aucune coupure entre les sections.\n- La **vedette** affiche maintenant les **meilleurs films récents** et **change à chaque visite**.\n- Affiches plus grandes, ligne rouge « Film • 2026 », défilement **fluide** des rangées avec les flèches."
+        },
+        {
+          "type": 12,
+          "items": [
+            {
+              "media": {
+                "url": "attachment://accueil.jpg"
+              }
+            },
+            {
+              "media": {
+                "url": "attachment://studios-top10.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "type": 10,
+          "content": "### 🦇 DC & Marvel + plateformes\n- Nouvelles tuiles **DC** et **Marvel** avec les vrais logos.\n- Un clic sur **Netflix, Prime, Disney+, DC, Marvel…** descend direct sur leurs films et séries.\n### 🏆 Top 10\n- **Top 10 des films** + nouveau **Top 10 des séries**, avec flèches gauche / droite."
+        },
+        {
+          "type": 14,
+          "spacing": 1,
+          "divider": true
+        },
+        {
+          "type": 10,
+          "content": "### 📚 Nouvelle page Sagas\n- Bouton **Sagas** en haut : Fast and Furious, Harry Potter, Star Wars, Le Seigneur des anneaux, Jurassic Park…\n- Chaque saga s'ouvre avec **tous ses films dans l'ordre**, et la recherche trouve une saga en tapant juste « fast » ou « star wars »."
+        },
+        {
+          "type": 12,
+          "items": [
+            {
+              "media": {
+                "url": "attachment://sagas.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "type": 10,
+          "content": "### 🎭 Fiche film refaite\n- **Vraies photos des acteurs** dans le casting.\n- Plus de bande-annonce YouTube en fond (et donc **plus de pubs**) : elle s'ouvre seulement si tu cliques sur « Bande-annonce »."
+        },
+        {
+          "type": 12,
+          "items": [
+            {
+              "media": {
+                "url": "attachment://fiche-film.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "type": 14,
+          "spacing": 1,
+          "divider": true
+        },
+        {
+          "type": 10,
+          "content": "### ▶️ Lecteur\n- Nouveau lecteur plus propre, menus **Saison / Épisode / Langue** redessinés.\n- La liste n'affiche plus que les **épisodes vraiment sortis**.\n- Bouton **« Épisode suivant »** directement sur l'image, qui passe au rouge à la fin de l'épisode."
+        },
+        {
+          "type": 12,
+          "items": [
+            {
+              "media": {
+                "url": "attachment://lecteur.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "type": 10,
+          "content": "### 📺 Cast sur la télé\n- **iPhone (Safari) : vérifié et fonctionnel ✅** — AirPlay vers Apple TV / télé compatible, ou **Chromecast via l'app VLC** (gratuite).\n- **PC (Chrome / Edge) et Android** : Chromecast direct depuis le bouton cast du lecteur."
+        },
+        {
+          "type": 14,
+          "spacing": 1,
+          "divider": true
+        },
+        {
+          "type": 10,
+          "content": "### 🔧 Corrigé\n- La barre rouge de la vedette et le changement d'image sont enfin synchronisés.\n- Sur iPhone, la croix ne passe plus sur l'heure et la batterie.\n- Plus de « [1] [2] » dans les synopsis, plus de trou à droite dans les grilles.\n- Les mots « Genre, Année… » n'apparaissent plus en double dans la barre du haut."
+        },
+        {
+          "type": 14,
+          "spacing": 1,
+          "divider": true
+        },
+        {
+          "type": 10,
+          "content": "-# 100 % gratuit, sans compte · <https://yutsioff.github.io/metalflix/>"
+        }
+      ],
+      "spoiler": false
+    }
+  ],
+  "flags": 32768
+}

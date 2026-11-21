@@ -23,6 +23,8 @@ import {
   type PlatformKey,
   type Title,
 } from "./lib/catalog";
+import { cloudEnabled, readSession } from "./lib/cloud";
+import { syncLibrary } from "./lib/sync";
 import { buildSagas, loadSagaSources, type SagaSource } from "./lib/sagas";
 import SagasPage from "./components/SagasPage";
 import { STUDIO_LABEL, STUDIO_ORDER, loadStudios, titleKey, type StudioKey, type StudioSets } from "./lib/studios";
@@ -209,6 +211,65 @@ export default function App() {
   const libId = profile?.id ?? LOCAL_PROFILE_ID;
   const [library, setLibrary] = useState<Library>(() => readLibrary(profile ? profile.id : LOCAL_PROFILE_ID));
   const progressRef = useRef({ key: "", ratio: -1 });
+
+  /**
+   * Cloud sync (lib/sync.ts): the signed-in account's history, positions and
+   * watchlist follow it from the phone to the PC. It runs at sign-in, when the
+   * tab comes back to the front, every 30 s while visible, and a moment after
+   * anything changes here.
+   */
+  const syncedJson = useRef("");
+  const syncing = useRef(false);
+  const synced = profile !== null && cloudEnabled() && readSession()?.userId === profile.id;
+  const runSync = useRef<() => void>(() => {});
+  runSync.current = () => {
+    if (!profile || !synced || syncing.current) return;
+    syncing.current = true;
+    const id = profile.id;
+    syncLibrary(id)
+      .then((merged) => {
+        syncedJson.current = JSON.stringify(merged);
+        setLibrary((current) => (JSON.stringify(current) === syncedJson.current ? current : merged));
+      })
+      .catch(() => {
+        // Offline or server asleep: the device copy stays, next round retries.
+      })
+      .finally(() => {
+        syncing.current = false;
+      });
+  };
+  useEffect(() => {
+    if (!synced) return;
+    runSync.current();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") runSync.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    const timer = window.setInterval(onVisible, 30_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.clearInterval(timer);
+    };
+  }, [synced, profile?.id]);
+  useEffect(() => {
+    if (!synced || JSON.stringify(library) === syncedJson.current) return;
+    const timer = window.setTimeout(() => runSync.current(), 2500);
+    return () => window.clearTimeout(timer);
+  }, [library, synced]);
+  // A profile signed in before the sync existed lives only on this device:
+  // it is signed out once so the next sign-in puts it online (same name, same
+  // password, its history comes along).
+  useEffect(() => {
+    if (cloudEnabled() && profile && profile.password.hash) {
+      signOut();
+      setProfile(null);
+      setLibrary(readLibrary(LOCAL_PROFILE_ID));
+      setAuthOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [catalog, setCatalog] = useState<Title[]>([]);
   const sagas = useMemo(
     () => (sagaSources && catalog.length ? buildSagas(sagaSources, catalog) : null),
