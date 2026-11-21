@@ -693,25 +693,68 @@ body {
   align-items: center;
 }
 
-/* Le chiffre géant noir cerclé de blanc, glissé sous la carte. */
+/* Le chiffre géant noir cerclé de blanc, comme la référence : entier, centré
+   sur la carte, et seul son bord droit glisse sous l'image. */
 .mf-top__rank {
   min-width: 0;
-  margin-right: -0.24em;
-  padding-bottom: 2.4rem;
+  margin-right: -0.06em;
+  padding-bottom: 2.3rem;
   color: #000;
-  font-family: var(--mf-font);
-  font-size: clamp(6rem, 14vw, 16rem);
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0;
+  font-family: "Inter", var(--mf-font);
+  font-size: clamp(5.5rem, 11.8vw, 14rem);
+  font-weight: 800;
+  line-height: 0.75;
+  letter-spacing: -0.04em;
   text-align: left;
   -webkit-text-stroke: 2px #fff;
   filter: none;
+  user-select: none;
+}
+
+/* Les flèches de la référence : des carrés sombres arrondis, sur les bords. */
+.mf-top__frame {
+  position: relative;
+}
+
+.mf-top__arrow {
+  position: absolute;
+  top: calc(50% - 1.3rem);
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3.75rem;
+  margin-top: -1.875rem;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(24, 24, 27, 0.92);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.mf-top__arrow[hidden] {
+  display: none;
+}
+
+.mf-top__arrow:hover {
+  background: var(--mf-accent);
+  transform: scale(1.05);
+}
+
+.mf-top__arrow--prev {
+  left: clamp(0.75rem, 2.2vw, 2.25rem);
+}
+
+.mf-top__arrow--next {
+  right: clamp(0.75rem, 2.2vw, 2.25rem);
 }
 
 .mf-top__body {
   gap: 1rem;
-  margin-right: 2rem;
+  margin-right: clamp(1.5rem, 4.3vw, 4.5rem);
 }
 
 .mf-top__card {
@@ -773,6 +816,12 @@ body {
     padding-bottom: 2rem;
     font-size: 5.5rem;
     -webkit-text-stroke-width: 1px;
+  }
+
+  .mf-top__arrow {
+    width: 2.5rem;
+    height: 3rem;
+    margin-top: -1.5rem;
   }
 
   .mf-top__card {

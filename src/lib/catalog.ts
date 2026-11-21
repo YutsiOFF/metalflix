@@ -428,4 +428,26 @@ export function ratedTop(list: Title[], count: number): Title[] {
   return picked.length ? picked : dailyPicks(list, count);
 }
 
+// ------------------------------------------------------------------ top séries
+// The catalogue carries no popularity signal for series (its head is simply the
+// newest year), so the shelf draws from the series everybody knows, kept only
+// when the catalogue can play them. Ids are TMDB *series* ids.
+const POPULAR_SERIES: number[] = [
+  1399, 79744, 66732, 94997, 1416, 76479, 119051, 93405, 71912, 1418, 1668, 2316, 60625, 82856,
+  84958, 63174, 71446, 1421, 61889, 63247, 87108, 65494, 1405, 4057, 46952, 70523, 85271, 125988,
+  136315, 95396, 1100, 60059, 62560, 67744, 1425, 4607, 44217, 71728, 73586, 111110, 124364, 110316,
+  106379, 84773, 18165, 39272, 69050, 60735, 1434, 456, 2190, 31917,
+];
+
+/**
+ * « Top 10 des séries aujourd'hui » : the best-known series the catalogue
+ * plays, in the order of the list above.
+ */
+export function seriesTop(list: Title[], count: number): Title[] {
+  const series = new Map<number, Title>();
+  for (const item of list) if (item.category === "serie" && !item.anime && item.poster) series.set(item.id, item);
+  const pool = POPULAR_SERIES.map((id) => series.get(id)).filter((item): item is Title => Boolean(item));
+  return pool.slice(0, count);
+}
+
 export const PAGE_SIZE = 72;

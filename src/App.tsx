@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Clapperboard, Film, Flame, LogIn, Menu, Search, Sparkles, Tv, X } from "lucide-react";
 import {
   CATEGORY_LABEL,
@@ -15,6 +15,7 @@ import {
   loadRestCatalog,
   mergeTitles,
   ratedTop,
+  seriesTop,
   searchTitles,
   yearsOf,
   type Category,
@@ -171,6 +172,8 @@ export default function App() {
   // « Top 10 des films aujourd'hui » : les films sortis récemment, classés par
   // note TMDB (scripts/top-rated.mjs) et limités à ce que le catalogue peut lire.
   const topFilms = useMemo(() => (catalog.length ? ratedTop(catalog, 10) : []), [catalog]);
+  // « Top 10 des séries aujourd'hui », placed right after the new-release rows.
+  const topSeries = useMemo(() => (catalog.length ? seriesTop(catalog, 10) : []), [catalog]);
 
   const genreOptions = useMemo(() => {
     const counts = new Map<GenreKey, number>();
@@ -828,18 +831,23 @@ export default function App() {
               )
             ) : (
               homeRows.map((row) => (
-                <Rail
-                  key={row.key}
-                  head={row.head}
-                  icon={row.icon}
-                  total={row.total}
-                  items={row.items}
-                  large={row.large}
-                  onSeeAll={row.onSeeAll}
-                  onOpen={openTitle}
-                  wantedIds={wantedIds}
-                  onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
-                />
+                <Fragment key={row.key}>
+                  <Rail
+                    head={row.head}
+                    icon={row.icon}
+                    total={row.total}
+                    items={row.items}
+                    large={row.large}
+                    onSeeAll={row.onSeeAll}
+                    onOpen={openTitle}
+                    wantedIds={wantedIds}
+                    onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
+                  />
+                  {/* Right under the new releases, the way the reference lays it out. */}
+                  {row.key === "new-serie" ? (
+                    <TopRail items={topSeries} onOpen={openTitle} title="Top 10 des séries aujourd'hui" series />
+                  ) : null}
+                </Fragment>
               ))
             )}
           </>

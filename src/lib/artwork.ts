@@ -29,26 +29,30 @@ function writeCache(cache: Cache) {
   }
 }
 
-async function backdropOf(id: number): Promise<string> {
-  const res = await fetch(`${VIEWER}${id}`, { headers: { accept: "text/html" } });
+async function backdropOf(id: number, series = false): Promise<string> {
+  // A series has its own TMDB id space: /<id> could be the film with the same
+  // number, so its still is read from the episode viewer instead.
+  const path = series ? `serie/${id}/1/1` : String(id);
+  const res = await fetch(`${VIEWER}${path}`, { headers: { accept: "text/html" } });
   if (!res.ok) return "";
   const match = IMAGE.exec(await res.text());
   return match ? `https://image.tmdb.org/t/p/original/${match[1]}` : "";
 }
 
 /** TMDB id → backdrop URL, empty string when the title has none. */
-export async function loadBackdrops(ids: number[]): Promise<Cache> {
+export async function loadBackdrops(ids: number[], series = false): Promise<Cache> {
   const cache = readCache();
-  const pending = ids.filter((id) => !(String(id) in cache));
-  if (!pending.length) return pick(cache, ids);
+  const keyOf = (id: number) => (series ? `s:${id}` : String(id));
+  const pending = ids.filter((id) => !(keyOf(id) in cache));
+  if (!pending.length) return pick(cache, ids, keyOf);
 
   try {
     const found = await Promise.all(
       pending.map(async (id) => {
         try {
-          return [String(id), await backdropOf(id)] as const;
+          return [keyOf(id), await backdropOf(id, series)] as const;
         } catch {
-          return [String(id), ""] as const;
+          return [keyOf(id), ""] as const;
         }
       }),
     );
@@ -58,13 +62,13 @@ export async function loadBackdrops(ids: number[]): Promise<Cache> {
     // Offline or blocked: the poster still fills the hero.
   }
 
-  return pick(cache, ids);
+  return pick(cache, ids, keyOf);
 }
 
-function pick(cache: Cache, ids: number[]): Cache {
+function pick(cache: Cache, ids: number[], keyOf: (id: number) => string): Cache {
   const found: Cache = {};
   for (const id of ids) {
-    const url = cache[String(id)];
+    const url = cache[keyOf(id)];
     if (url) found[String(id)] = url;
   }
   return found;
