@@ -12,6 +12,43 @@ interface SagasPageProps {
   onOpen: (item: Title) => void;
   wantedIds: Set<number>;
   onToggleWatch: (item: Title) => void;
+  /** The header's search box: on this page it searches the sagas. */
+  query: string;
+}
+
+/** "Fast & Furious", "fast and furious", "Fást" all meet on "fast furious". */
+function norm(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Sagas whose name — or one of whose films — holds every word typed. A saga
+ * found by its own name comes before one found through a film's title.
+ */
+function searchSagas(sagas: Saga[], query: string): Saga[] {
+  const words = norm(query).split(" ").filter(Boolean);
+  if (!words.length) return sagas;
+  const named: Saga[] = [];
+  const byFilm: Saga[] = [];
+  for (const saga of sagas) {
+    const name = norm(saga.name);
+    if (words.every((word) => name.includes(word))) {
+      named.push(saga);
+      continue;
+    }
+    const inFilms = saga.films.some((item) => {
+      const title = norm(`${item.title} ${item.alt ?? ""}`);
+      return words.every((word) => title.includes(word));
+    });
+    if (inFilms) byFilm.push(saga);
+  }
+  return [...named, ...byFilm];
 }
 
 function Meta({ saga }: { saga: Saga }) {
@@ -29,8 +66,20 @@ function Meta({ saga }: { saga: Saga }) {
  * « Sagas » : one card per saga, its posters fanned out, then the saga's own
  * page with every film in release order.
  */
-export default function SagasPage({ sagas, failed, openId, onOpenSaga, onOpen, wantedIds, onToggleWatch }: SagasPageProps) {
-  const open = openId && sagas ? sagas.find((saga) => saga.id === openId) ?? null : null;
+export default function SagasPage({
+  sagas,
+  failed,
+  openId,
+  onOpenSaga,
+  onOpen,
+  wantedIds,
+  onToggleWatch,
+  query,
+}: SagasPageProps) {
+  const searching = query.trim().length > 0;
+  // Typing while a saga is open goes back to the list, filtered.
+  const open = !searching && openId && sagas ? sagas.find((saga) => saga.id === openId) ?? null : null;
+  const shown = sagas ? searchSagas(sagas, query) : null;
 
   if (open) {
     return (
@@ -63,10 +112,18 @@ export default function SagasPage({ sagas, failed, openId, onOpenSaga, onOpen, w
         <h1>
           <Library size={22} /> Sagas
         </h1>
-        {sagas ? <p className="mf-sagas__sub">{sagas.length} sagas disponibles, des premiers films aux derniers.</p> : null}
+        {sagas && shown ? (
+          <p className="mf-sagas__sub">
+            {searching
+              ? shown.length
+                ? `${shown.length} saga${shown.length > 1 ? "s" : ""} pour « ${query.trim()} »`
+                : `Aucune saga pour « ${query.trim()} »`
+              : `${sagas.length} sagas disponibles, des premiers films aux derniers.`}
+          </p>
+        ) : null}
       </div>
 
-      {!sagas ? (
+      {!sagas || !shown ? (
         failed ? (
           <div className="mf-panel mf-empty">
             <h3>Sagas indisponibles</h3>
@@ -80,7 +137,7 @@ export default function SagasPage({ sagas, failed, openId, onOpenSaga, onOpen, w
         )
       ) : (
         <ul className="mf-sagas__grid">
-          {sagas.map((saga) => (
+          {shown.map((saga) => (
             <li key={saga.id}>
               <button type="button" className="mf-saga" onClick={() => onOpenSaga(saga.id)}>
                 <span className={`mf-saga__stack mf-saga__stack--${Math.min(saga.films.length, 4)}`}>

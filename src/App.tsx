@@ -683,7 +683,11 @@ export default function App() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={`Rechercher parmi ${catalog.length.toLocaleString("fr-FR")} titres…`}
+            placeholder={
+              page.name === "sagas"
+                ? "Rechercher une saga (Fast and Furious, Star Wars…)"
+                : `Rechercher parmi ${catalog.length.toLocaleString("fr-FR")} titres…`
+            }
             aria-label="Rechercher dans le catalogue"
           />
           {query ? (
@@ -821,6 +825,7 @@ export default function App() {
             onOpen={openTitle}
             wantedIds={wantedIds}
             onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
+            query={query}
           />
         ) : route.name === "account" ? (
           <AccountPage
