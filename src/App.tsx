@@ -1,19 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Clapperboard, Film, LogIn, Search, Sparkles, Tv } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Clapperboard, Film, Flame, LogIn, Menu, Search, Sparkles, Tv, X } from "lucide-react";
 import {
   CATEGORY_LABEL,
   GENRE_LABEL,
   GENRE_ORDER,
   PAGE_SIZE,
+  PLATFORM_LABEL,
+  PLATFORM_ORDER,
   countByCategory,
   dailyPicks,
   findTitle,
   loadCatalog,
+  loadFreshAdditions,
   loadRestCatalog,
+  mergeTitles,
+  ratedTop,
   searchTitles,
   yearsOf,
   type Category,
   type GenreKey,
+  type PlatformKey,
   type Title,
 } from "./lib/catalog";
 import { currentProfileId, listProfiles, signOut, type Profile } from "./lib/accounts";
@@ -34,22 +40,68 @@ import {
 import Dropdown from "./components/Dropdown";
 import Hero from "./components/Hero";
 import ResumeRail from "./components/ResumeRail";
+import StudioRail from "./components/StudioRail";
+import TopRail from "./components/TopRail";
+import Rail from "./components/Rail";
 import PosterCard from "./components/PosterCard";
 import PlayerModal, { type PlaySubject } from "./components/PlayerModal";
 import DirectLookup from "./components/DirectLookup";
 import AccountModal from "./components/AccountModal";
 import AccountPage from "./components/AccountPage";
+import InstallButton from "./components/InstallButton";
+import UpdateNotice from "./components/UpdateNotice";
 
-type Filter = Category | "all";
+type Filter = Category | "all" | "nouveaute";
 type Sort = "default" | "recent" | "oldest";
 type Route = { name: "home" } | { name: "account" } | { name: "title"; id: number };
 
-const FILTERS: Filter[] = ["all", "film", "serie", "anime"];
+const FILTERS: Filter[] = ["all", "film", "serie", "anime", "nouveaute"];
+const FILTER_LABEL: Record<Filter, string> = { ...CATEGORY_LABEL, nouveaute: "Nouveautés" };
+/** Genres worth their own row on the home page, most browsed first. */
+const GENRE_ROWS: GenreKey[] = ["horror", "action", "comedy", "scifi", "thriller", "drama", "animation", "romance"];
+/** "Nouveautés" only lists what actually came out: this year and the last one. */
+const CURRENT_YEAR = new Date().getFullYear();
+const NEW_SINCE = CURRENT_YEAR - 1;
+const TODAY = new Date().toISOString().slice(0, 10);
+
+/**
+ * Already out, with a date we could check. A title the API added after the
+ * build (`fresh`) carries the year the API announced, and a film that was only
+ * announced carries one that does not exist yet: neither may reach a row.
+ */
+function isReleased(item: Title): boolean {
+  if (item.pending || item.fresh) return false;
+  if (item.date) return item.date <= TODAY;
+  return item.year > 0 && item.year <= CURRENT_YEAR;
+}
+
+/** Released and with a poster: the pool rows draw from. */
+function posterPool(list: Title[]): Title[] {
+  return list.filter((item) => item.poster && isReleased(item));
+}
+
+/** Newest first, capped at one row. */
+function freshTitles(list: Title[], limit = 40): Title[] {
+  return list
+    .filter((item) => isReleased(item) && item.year >= NEW_SINCE && item.year <= CURRENT_YEAR)
+    .sort((a, b) => b.year - a.year)
+    .slice(0, limit);
+}
 const SORT_LABEL: Record<Sort, string> = {
   default: "Pertinence",
   recent: "Année ↓",
   oldest: "Année ↑",
 };
+
+interface HomeRow {
+  key: string;
+  head: string;
+  icon?: ReactNode;
+  items: Title[];
+  total?: number;
+  large?: boolean;
+  onSeeAll?: () => void;
+}
 
 function parseHash(): Route {
   const hash = window.location.hash;
@@ -69,6 +121,9 @@ function subjectFor(catalog: Title[], id: number): PlaySubject | null {
     poster: item.poster,
     year: item.year,
     category: item.category,
+    genres: item.genres,
+    source: item.source,
+    slug: item.slug,
   };
 }
 
@@ -77,12 +132,22 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>("all");
   const [genre, setGenre] = useState<GenreKey | "all">("all");
   const [year, setYear] = useState<number | "all">("all");
+  const [platform, setPlatform] = useState<PlatformKey | "all">("all");
   const [sort, setSort] = useState<Sort>("default");
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [manual, setManual] = useState<PlaySubject | null>(null);
-  const [resume, setResume] = useState<{ id: number; season: number; episode: number } | null>(null);
+  const [resume, setResume] = useState<{
+    id: number;
+    season: number;
+    episode: number;
+    /** 0–1, the position the viewer had reached in that episode. */
+    progress?: number;
+  } | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  // Only the phone layout reads this: there the filters and the account live
+  // behind a button instead of sharing the header row.
+  const [navOpen, setNavOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(() => {
     const id = currentProfileId();
     return id ? listProfiles().find((p) => p.id === id) ?? null : null;
@@ -94,35 +159,99 @@ export default function App() {
   const [catalog, setCatalog] = useState<Title[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const featured = useMemo(() => (catalog.length ? dailyPicks(catalog, 6) : []), [catalog]);
+  // Three titles in the hero: only the newest, only three, and never an anime —
+  // the anime shelf has its own rows further down.
+  const featured = useMemo(
+    () =>
+      catalog.length
+        ? dailyPicks(catalog.filter((item) => item.category !== "anime" && !item.anime), 3)
+        : [],
+    [catalog],
+  );
+  // « Top 10 des films aujourd'hui » : les films sortis récemment, classés par
+  // note TMDB (scripts/top-rated.mjs) et limités à ce que le catalogue peut lire.
+  const topFilms = useMemo(() => (catalog.length ? ratedTop(catalog, 10) : []), [catalog]);
 
   const genreOptions = useMemo(() => {
     const counts = new Map<GenreKey, number>();
     for (const item of catalog) for (const key of item.genres) counts.set(key, (counts.get(key) ?? 0) + 1);
     return [
-      { value: "all", label: "Tous les genres", count: catalog.length },
+      { value: "all", label: "Tous les genres", compact: "Genre", count: catalog.length },
       ...GENRE_ORDER.map((key) => ({ value: key, label: GENRE_LABEL[key], count: counts.get(key) ?? 0 })),
     ];
   }, [catalog]);
 
   const yearOptions = useMemo(
     () => [
-      { value: "all", label: "Toutes les années", count: catalog.length },
+      { value: "all", label: "Toutes les années", compact: "Année", count: catalog.length },
       ...yearsOf(catalog).map(({ year: value, count }) => ({ value: String(value), label: String(value), count })),
     ],
     [catalog],
   );
 
   const sortOptions = useMemo(
-    () => (Object.keys(SORT_LABEL) as Sort[]).map((value) => ({ value, label: SORT_LABEL[value] })),
+    () =>
+      (Object.keys(SORT_LABEL) as Sort[]).map((value) => ({
+        value,
+        label: SORT_LABEL[value],
+        // The header hides the field names on phones, so the closed button says
+        // what it sorts rather than repeating the current value alone.
+        compact: value === "default" ? "Pertinence" : SORT_LABEL[value],
+      })),
     [],
   );
+
+  // Only the services actually carrying something are offered: an empty
+  // platform would just add a row that always lands on "aucun résultat".
+  const platformOptions = useMemo(() => {
+    const counts = new Map<PlatformKey, number>();
+    for (const item of catalog) for (const key of item.platforms) counts.set(key, (counts.get(key) ?? 0) + 1);
+    return [
+      { value: "all", label: "Toutes les plateformes", compact: "Plateforme" },
+      ...PLATFORM_ORDER.filter((key) => (counts.get(key) ?? 0) > 0).map((key) => ({
+        value: key,
+        label: PLATFORM_LABEL[key],
+        count: counts.get(key) ?? 0,
+      })),
+    ];
+  }, [catalog]);
+
+  /** The platform tiles only show services that carry at least one title. */
+  const studioCounts = useMemo(() => {
+    const counts = new Map<PlatformKey, number>();
+    for (const item of catalog) for (const key of item.platforms) counts.set(key, (counts.get(key) ?? 0) + 1);
+    return PLATFORM_ORDER.filter((key) => (counts.get(key) ?? 0) > 0).map((key) => ({
+      key,
+      label: PLATFORM_LABEL[key],
+      count: counts.get(key) ?? 0,
+    }));
+  }, [catalog]);
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+  // The drawer must not stay open behind a new page, a wider window or Escape.
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNavOpen(false);
+    };
+    const wide = window.matchMedia("(min-width: 901px)");
+    const onWide = () => {
+      if (wide.matches) setNavOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    wide.addEventListener("change", onWide);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      wide.removeEventListener("change", onWide);
+    };
+  }, [navOpen]);
+
+  useEffect(() => setNavOpen(false), [route]);
 
   useEffect(() => {
     let alive = true;
@@ -135,13 +264,18 @@ export default function App() {
       loadRestCatalog((all) => {
         if (alive) setCatalog(all);
       });
+      // The build is a snapshot: ask the API what it gained since, so a title
+      // added today reaches the hero and the "Nouveautés" rows by itself.
+      loadFreshAdditions().then((added) => {
+        if (alive && added.length) setCatalog((all) => mergeTitles(all, added));
+      });
     });
     return () => {
       alive = false;
     };
   }, []);
 
-  useEffect(() => setVisible(PAGE_SIZE), [filter, genre, year, sort, query]);
+  useEffect(() => setVisible(PAGE_SIZE), [filter, genre, platform, year, sort, query]);
 
   const wantedIds = useMemo(() => new Set(library.watchlist.map((item) => item.id)), [library.watchlist]);
 
@@ -155,21 +289,33 @@ export default function App() {
     () =>
       catalog.filter(
         (item) =>
-          (filter === "all" || item.category === filter) &&
+          (filter === "all"
+            ? true
+            : filter === "nouveaute"
+              ? item.year >= NEW_SINCE && item.year <= CURRENT_YEAR
+              : item.category === filter) &&
           (genre === "all" || item.genres.includes(genre)) &&
+          (platform === "all" || item.platforms.includes(platform)) &&
           (year === "all" || item.year === year),
       ),
-    [catalog, filter, genre, year],
+    [catalog, filter, genre, platform, year],
   );
 
   const results = useMemo(() => {
     const list = searchTitles(query, filtered);
+    if (sort === "default" && filter === "nouveaute") return [...list].sort((a, b) => b.year - a.year);
     if (sort === "recent") return [...list].sort((a, b) => b.year - a.year);
     if (sort === "oldest") return [...list].sort((a, b) => a.year - b.year);
     return list;
-  }, [filtered, query, sort]);
+  }, [filter, filtered, query, sort]);
 
-  const searchMode = query.trim().length > 0 || filter !== "all" || genre !== "all" || year !== "all" || sort !== "default";
+  const searchMode =
+    query.trim().length > 0 ||
+    filter !== "all" ||
+    genre !== "all" ||
+    platform !== "all" ||
+    year !== "all" ||
+    sort !== "default";
   const numeric = /^\d+$/.test(query.trim());
   const numericHit = numeric ? findTitle(catalog, Number(query.trim())) : undefined;
 
@@ -177,16 +323,93 @@ export default function App() {
   const openSubject = manual ?? routeSubject;
   const openDone = openSubject ? library.history.find((item) => item.id === openSubject.id)?.done ?? false : false;
 
-  const rails = useMemo(
-    () =>
-      (["film", "serie", "anime"] as Category[]).map((category) => ({
-        category,
-        items: catalog.filter((item) => item.category === category).slice(0, 36),
-      })),
-    [catalog],
-  );
+  /**
+   * Home rows, Netflix style: what is new first, then one row per kind, then
+   * the genres worth browsing. Every row is capped at 40 posters — "Tout voir"
+   * hands the whole category over to the grid underneath.
+   */
+  const homeRows = useMemo<HomeRow[]>(() => {
+    const withPoster = posterPool(catalog);
 
-  function openTitle(item: Title, at?: { season: number; episode: number }) {
+    const categoryRows: HomeRow[] = (["film", "serie", "anime"] as Category[]).map((category) => ({
+      key: category,
+      head: CATEGORY_LABEL[category],
+      icon: category === "film" ? <Film size={16} /> : category === "serie" ? <Tv size={16} /> : <Sparkles size={16} />,
+      items: withPoster.filter((item) => item.category === category).slice(0, 40),
+      total: countByCategory(catalog, category),
+      onSeeAll: () => setFilter(category),
+    }));
+
+    const genreRows: HomeRow[] = GENRE_ROWS.map((genre) => ({
+      key: genre,
+      head: GENRE_LABEL[genre],
+      items: withPoster.filter((item) => item.genres.includes(genre)).slice(0, 40),
+      onSeeAll: () => setGenre(genre),
+    })).filter((row) => row.items.length >= 8);
+
+    return [
+      {
+        key: "new-film",
+        head: "Nouveautés films",
+        icon: <Flame size={16} />,
+        items: freshTitles(withPoster.filter((item) => item.category === "film")),
+        large: true,
+        onSeeAll: () => setFilter("nouveaute"),
+      },
+      {
+        key: "new-serie",
+        head: "Nouveautés séries",
+        icon: <Flame size={16} />,
+        items: freshTitles(withPoster.filter((item) => item.category === "serie")),
+        large: true,
+        onSeeAll: () => setFilter("nouveaute"),
+      },
+      ...categoryRows,
+      ...genreRows,
+    ];
+  }, [catalog]);
+
+  /**
+   * The same block of rows, rebuilt over whatever the filters selected: picking
+   * "Horreur" or "Histoire" used to drop straight to a flat grid, so the newest
+   * titles of that genre had no row of their own.
+   */
+  const resultRows = useMemo<HomeRow[]>(() => {
+    if (!searchMode || query.trim()) return [];
+    const pool = posterPool(results);
+    const scope = [
+      platform !== "all" ? PLATFORM_LABEL[platform] : null,
+      genre !== "all" ? GENRE_LABEL[genre] : null,
+      year !== "all" ? String(year) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const rows: HomeRow[] = [];
+    const fresh = freshTitles(pool);
+    if (fresh.length)
+      rows.push({
+        key: "fresh",
+        head: scope ? `Nouveautés · ${scope}` : "Nouveautés",
+        icon: <Flame size={16} />,
+        items: fresh,
+        large: true,
+      });
+
+    for (const category of ["film", "serie", "anime"] as Category[]) {
+      const items = pool.filter((item) => item.category === category).slice(0, 40);
+      if (!items.length) continue;
+      rows.push({
+        key: `res-${category}`,
+        head: CATEGORY_LABEL[category],
+        icon: category === "film" ? <Film size={16} /> : category === "serie" ? <Tv size={16} /> : <Sparkles size={16} />,
+        items,
+        total: pool.filter((item) => item.category === category).length,
+      });
+    }
+    return rows;
+  }, [genre, platform, query, results, searchMode, year]);
+
+  function openTitle(item: Title, at?: { season: number; episode: number; progress?: number }) {
     setResume(at ? { id: item.id, ...at } : null);
     window.location.hash = `/t/${item.id}`;
   }
@@ -260,7 +483,7 @@ export default function App() {
   }
 
   function resumeFrom(entry: HistoryEntry) {
-    const at = { season: entry.season ?? 1, episode: entry.episode ?? 1 };
+    const at = { season: entry.season ?? 1, episode: entry.episode ?? 1, progress: entry.progress };
     const title = findTitle(catalog, entry.id);
     if (title) {
       openTitle(title, at);
@@ -319,15 +542,42 @@ export default function App() {
   function resetFilters() {
     setFilter("all");
     setGenre("all");
+    setPlatform("all");
     setYear("all");
     setSort("default");
     setQuery("");
   }
 
+  /**
+   * The logo means "start over": home, no filter, no search, nothing open. It
+   * used to only re-point the hash, so a search or a genre stayed stuck on the
+   * page it took you back to.
+   */
+  function goHome() {
+    resetFilters();
+    setVisible(PAGE_SIZE);
+    setManual(null);
+    setResume(null);
+    setNavOpen(false);
+    if (window.location.hash) {
+      history.pushState("", document.title, `${window.location.pathname}${window.location.search}`);
+    }
+    setRoute({ name: "home" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div className="mf-shell">
       <header className="mf-header">
-        <a className="mf-logo" href="#/" aria-label="MetalFlix, retour en haut">
+        <a
+          className="mf-logo"
+          href="#/"
+          aria-label="MetalFlix, retour à l'accueil"
+          onClick={(event) => {
+            event.preventDefault();
+            goHome();
+          }}
+        >
           <Clapperboard size={18} strokeWidth={2.2} />
           <span>
             METAL<strong>FLIX</strong>
@@ -350,29 +600,95 @@ export default function App() {
           ) : null}
         </div>
 
+        <button
+          type="button"
+          className="mf-nav__toggle"
+          aria-expanded={navOpen}
+          aria-controls="mf-nav"
+          aria-label={navOpen ? "Fermer le menu" : "Ouvrir le menu"}
+          onClick={() => setNavOpen((value) => !value)}
+        >
+          {navOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+
+        {navOpen ? (
+          <button
+            type="button"
+            className="mf-nav__scrim"
+            aria-label="Fermer le menu"
+            tabIndex={-1}
+            onClick={() => setNavOpen(false)}
+          />
+        ) : null}
+
+        <div className="mf-nav" id="mf-nav" data-open={navOpen ? "true" : undefined}>
+        <button
+          type="button"
+          className="mf-nav__close"
+          aria-label="Fermer le menu"
+          onClick={() => setNavOpen(false)}
+        >
+          <X size={16} />
+        </button>
         <div className="mf-filters" role="group" aria-label="Filtres du catalogue">
           <Dropdown
             label="Genre"
             value={genre}
             options={genreOptions}
-            onChange={(value) => setGenre(value as GenreKey | "all")}
+            onChange={(value) => {
+              setGenre(value as GenreKey | "all");
+              setNavOpen(false);
+            }}
           />
           <Dropdown
             label="Année"
             value={String(year)}
             options={yearOptions}
-            onChange={(value) => setYear(value === "all" ? "all" : Number(value))}
+            onChange={(value) => {
+              setYear(value === "all" ? "all" : Number(value));
+              setNavOpen(false);
+            }}
           />
-          <Dropdown label="Tri" value={sort} options={sortOptions} onChange={(value) => setSort(value as Sort)} />
-          <button type="button" className="mf-btn mf-btn--sm" onClick={resetFilters}>
+          <Dropdown
+            label="Plateforme"
+            value={platform}
+            options={platformOptions}
+            onChange={(value) => {
+              setPlatform(value as PlatformKey | "all");
+              setNavOpen(false);
+            }}
+          />
+          <Dropdown
+            label="Tri"
+            value={sort}
+            options={sortOptions}
+            onChange={(value) => {
+              setSort(value as Sort);
+              setNavOpen(false);
+            }}
+          />
+          <button
+            type="button"
+            className="mf-btn mf-btn--sm"
+            onClick={() => {
+              resetFilters();
+              setNavOpen(false);
+            }}
+          >
             Réinitialiser
           </button>
         </div>
 
+        <InstallButton />
+
         <button
           type="button"
           className="mf-account-btn"
-          onClick={() => (profile ? (window.location.hash = "/compte") : setAuthOpen(true))}
+          onClick={() => {
+            setNavOpen(false);
+            if (profile) window.location.hash = "/compte";
+            else setAuthOpen(true);
+          }}
         >
           {profile ? (
             <>
@@ -385,6 +701,7 @@ export default function App() {
             </>
           )}
         </button>
+        </div>
       </header>
 
       <main>
@@ -409,6 +726,16 @@ export default function App() {
           <>
             <Hero items={featured} onPlay={openTitle} />
 
+            {/* Kept on the results page too: it is how you switch studio, and
+                tapping the active tile is the way back to the whole catalogue. */}
+            <StudioRail
+              counts={studioCounts}
+              active={platform}
+              onPick={(key) => setPlatform((current) => (current === key ? "all" : key))}
+            />
+
+            <TopRail items={topFilms} onOpen={openTitle} />
+
             {!searchMode && resumable.length > 0 ? (
               <ResumeRail
                 items={resumable}
@@ -428,7 +755,7 @@ export default function App() {
                     className={`mf-seg__btn mf-seg__btn--${value}${filter === value ? " is-active" : ""}`}
                     onClick={() => setFilter(value)}
                   >
-                    {CATEGORY_LABEL[value]}
+                    {FILTER_LABEL[value]}
                   </button>
                 ))}
               </div>
@@ -448,90 +775,104 @@ export default function App() {
               <section className="mf-section">
                 <div className="mf-panel mf-empty">
                   <h3>Aucun titre ne correspond</h3>
-                  <p>Essayez un autre mot-clé, un autre genre, ou collez un id TMDB pour ouvrir le lecteur directement.</p>
+                  <p>Essayez un autre mot-clé, un autre genre, ou collez un identifiant de titre pour ouvrir le lecteur.</p>
                 </div>
               </section>
             ) : null}
 
             {searchMode ? (
               results.length > 0 && (
-                <section className="mf-section" aria-label="Résultats">
-                  <div className="mf-section__head">
-                    <h2>{query.trim() ? "Résultats" : CATEGORY_LABEL[filter]}</h2>
-                    <span>{results.length}</span>
-                  </div>
-                  <div className="mf-grid">
-                    {results.slice(0, visible).map((item) => (
-                      <PosterCard
-                        key={item.id}
-                        item={item}
-                        onOpen={openTitle}
-                        wanted={wantedIds.has(item.id)}
-                        onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
-                      />
-                    ))}
-                  </div>
-                  {visible < results.length ? (
-                    <div className="mf-loadmore">
-                      <button
-                        type="button"
-                        className="mf-btn"
-                        onClick={() => setVisible((value) => value + PAGE_SIZE * 2)}
-                      >
-                        Charger {Math.min(PAGE_SIZE * 2, results.length - visible)} titres de plus
-                      </button>
+                <>
+                  {resultRows.map((row) => (
+                    <Rail
+                      key={row.key}
+                      head={row.head}
+                      icon={row.icon}
+                      total={row.total}
+                      items={row.items}
+                      large={row.large}
+                      onOpen={openTitle}
+                      wantedIds={wantedIds}
+                      onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
+                    />
+                  ))}
+                  <section className="mf-section" aria-label="Résultats">
+                    <div className="mf-section__head">
+                      <h2>{query.trim() ? "Résultats" : FILTER_LABEL[filter]}</h2>
+                      <span>{results.length}</span>
                     </div>
-                  ) : null}
-                </section>
-              )
-            ) : (
-              rails.map(
-                (rail) =>
-                  rail.items.length > 0 && (
-                    <section className="mf-section" key={rail.category} aria-label={CATEGORY_LABEL[rail.category]}>
-                      <div className="mf-section__head">
-                        <h2>
-                          {rail.category === "film" ? (
-                            <Film size={16} />
-                          ) : rail.category === "serie" ? (
-                            <Tv size={16} />
-                          ) : (
-                            <Sparkles size={16} />
-                          )}
-                          {CATEGORY_LABEL[rail.category]}
-                          <span className="mf-section__total">{countByCategory(catalog, rail.category)}</span>
-                        </h2>
-                        <button type="button" className="mf-more" onClick={() => setFilter(rail.category)}>
-                          Tout voir →
+                    <div className="mf-grid">
+                      {results.slice(0, visible).map((item) => (
+                        <PosterCard
+                          key={item.id}
+                          item={item}
+                          onOpen={openTitle}
+                          wanted={wantedIds.has(item.id)}
+                          onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
+                        />
+                      ))}
+                    </div>
+                    {visible < results.length ? (
+                      <div className="mf-loadmore">
+                        <button
+                          type="button"
+                          className="mf-btn"
+                          onClick={() => setVisible((value) => value + PAGE_SIZE * 2)}
+                        >
+                          Charger {Math.min(PAGE_SIZE * 2, results.length - visible)} titres de plus
                         </button>
                       </div>
-                      <div className="mf-rail">
-                        {rail.items.map((item) => (
-                          <PosterCard
-                            key={item.id}
-                            item={item}
-                            onOpen={openTitle}
-                            wanted={wantedIds.has(item.id)}
-                            onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ),
+                    ) : null}
+                  </section>
+                </>
               )
+            ) : (
+              homeRows.map((row) => (
+                <Rail
+                  key={row.key}
+                  head={row.head}
+                  icon={row.icon}
+                  total={row.total}
+                  items={row.items}
+                  large={row.large}
+                  onSeeAll={row.onSeeAll}
+                  onOpen={openTitle}
+                  wantedIds={wantedIds}
+                  onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
+                />
+              ))
             )}
           </>
         )}
 
         <footer className="mf-footer">
+          <div className="mf-thanks">
+            <h2>Merci aux bêta-testeurs</h2>
+            <p>
+              Les tout premiers à avoir essayé MetalFlix, à signaler les bugs et à aider à les régler — une bonne
+              partie de ce qui marche aujourd'hui vient de leurs retours.
+            </p>
+            <ul className="mf-thanks__list">
+              <li>Hyska</li>
+              <li>Volrod</li>
+              <li>Hansoleil</li>
+              <li>Laura</li>
+            </ul>
+          </div>
           <p>
-            Catalogue et lecteur : <a href="https://api.moviez.ac/">Moviez API</a> — {catalog.length.toLocaleString("fr-FR")}{" "}
-            titres réellement servis par l'API, affiches TMDB. Aucune clé requise : <code>/api/check/&lt;id&gt;</code> suffit.
+            {catalog.length.toLocaleString("fr-FR")} films, séries et animes jouables directement dans le lecteur — pas
+            d'inscription, pas de clé à fournir.
           </p>
           <p>
-            Comptes, historique et watch list sont stockés dans ce navigateur — site statique servi par GitHub Pages.
-            Genres issus de Wikidata.
+            Le compte, l'historique et la liste restent dans ce navigateur : rien n'est envoyé ailleurs.
           </p>
+          <button
+            type="button"
+            className="mf-footer__news"
+            onClick={() => window.dispatchEvent(new Event("metalflix:update-open"))}
+          >
+            Nouveautés du site
+          </button>
         </footer>
       </main>
 
@@ -560,6 +901,8 @@ export default function App() {
       ) : null}
 
       {authOpen ? <AccountModal onClose={() => setAuthOpen(false)} onAuthenticated={handleAuthenticated} /> : null}
+
+      <UpdateNotice />
     </div>
   );
 }

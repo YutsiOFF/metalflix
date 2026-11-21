@@ -1,0 +1,445 @@
+/* =====================================================================
+   MetalFlix — thème « clean »
+   Couche visuelle chargée APRÈS styles.css : elle ne fait que repeindre
+   (typo, couleurs, rayons, cartes). Aucune classe ni logique n'est
+   modifiée. Pour revenir à l'ancien look, retirer l'import dans main.tsx.
+   ===================================================================== */
+
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/poppins-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/poppins-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/poppins-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("./assets/fonts/poppins-latin-800-normal.woff2") format("woff2");
+}
+
+:root {
+  --mf-bg: #09090b;
+  --mf-bg-raised: #111114;
+  --mf-surface: #141418;
+  --mf-surface-2: #1b1b20;
+  --mf-surface-3: #25252c;
+  --mf-line: rgba(255, 255, 255, 0.07);
+  --mf-line-strong: rgba(255, 255, 255, 0.14);
+  --mf-text-2: #b9b9c3;
+  --mf-text-3: #7c7c88;
+
+  --mf-radius-s: 6px;
+  --mf-radius: 10px;
+  --mf-radius-l: 12px;
+
+  --mf-display: "Poppins", "Inter", system-ui, sans-serif;
+
+  --mf-card-w: 168px;
+  --mf-card-w-lg: 196px;
+}
+
+@media (min-width: 1700px) {
+  :root {
+    --mf-card-w: 184px;
+    --mf-card-w-lg: 214px;
+  }
+}
+
+@media (max-width: 820px) {
+  :root {
+    --mf-card-w: 122px;
+    --mf-card-w-lg: 140px;
+  }
+}
+
+/* Fond uni : plus de halo rouge en haut de page. */
+.mf-shell {
+  background: var(--mf-bg);
+}
+
+/* ------------------------------- header ------------------------------ */
+
+.mf-header {
+  background: linear-gradient(180deg, rgba(9, 9, 11, 0.92) 0%, rgba(9, 9, 11, 0.6) 65%, transparent 100%);
+}
+
+.mf-logo span {
+  font-family: var(--mf-display);
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-shadow: none;
+}
+
+.mf-logo strong {
+  font-weight: 800;
+}
+
+.mf-header__search {
+  border-radius: 999px;
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mf-header__search:focus-within {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(15, 15, 18, 0.95);
+}
+
+.mf-account-btn,
+.mf-nav__toggle {
+  border-color: transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mf-account-btn__avatar {
+  border-radius: 50%;
+}
+
+/* Les filtres du header : des pastilles sans contour. */
+.mf-header .mf-select {
+  border-color: transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mf-header .mf-select:hover,
+.mf-header .mf-select[data-open="true"] {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.mf-header .mf-btn {
+  border-color: transparent;
+}
+
+/* ------------------------------ buttons ------------------------------ */
+
+.mf-btn {
+  border-radius: 999px;
+  font-family: var(--mf-display);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.mf-btn--primary {
+  background: var(--mf-accent);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(229, 9, 20, 0.28);
+}
+
+.mf-btn--primary:hover {
+  background: var(--mf-accent-hover);
+}
+
+.mf-more {
+  color: var(--mf-text-2);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.mf-more:hover {
+  color: var(--mf-accent);
+}
+
+/* -------------------------------- hero ------------------------------- */
+
+.mf-hero__veil {
+  background:
+    linear-gradient(90deg, rgba(9, 9, 11, 0.95) 0%, rgba(9, 9, 11, 0.7) 36%, rgba(9, 9, 11, 0.05) 72%),
+    linear-gradient(180deg, rgba(9, 9, 11, 0.55) 0%, transparent 28%, rgba(9, 9, 11, 0.4) 72%, var(--mf-bg) 100%);
+}
+
+.mf-eyebrow {
+  color: var(--mf-accent);
+  font-family: var(--mf-display);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.mf-hero__title {
+  font-family: var(--mf-display);
+  font-weight: 700;
+  font-size: clamp(2.2rem, 4.6vw, 4.1rem);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.45);
+}
+
+.mf-hero__meta {
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.mf-hero__meta .mf-chip {
+  border: 0;
+  background: var(--mf-accent);
+  color: #fff;
+}
+
+.mf-hero__synopsis {
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.mf-hero__actions .mf-btn {
+  height: 2.75rem;
+  padding: 0 1.5rem;
+  font-size: 0.9rem;
+}
+
+.mf-hero__arrow {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mf-hero__dots button {
+  width: 1.1rem;
+  height: 4px;
+  border-radius: 4px;
+  transition: width 0.3s var(--mf-ease);
+}
+
+.mf-hero__dots button.is-active {
+  width: 2rem;
+}
+
+/* --------------------------- section titles -------------------------- */
+
+.mf-section__head h2,
+.mf-row__head h2,
+.mf-top__head h2,
+.mf-studios__head h2 {
+  font-family: var(--mf-display);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Les icônes devant chaque titre alourdissaient la page. */
+.mf-row__head h2 svg {
+  display: none;
+}
+
+.mf-row__head h2 small {
+  font-family: "Inter", system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--mf-text-3);
+}
+
+.mf-row {
+  padding-bottom: 1.1rem;
+}
+
+.mf-rail {
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.mf-row__arrow {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-top: -2.4rem;
+  border-radius: 50%;
+  background: rgba(20, 20, 24, 0.88);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.mf-row__arrow:hover {
+  background: #fff;
+  color: #000;
+}
+
+/* ------------------------------ toolbar ------------------------------ */
+
+.mf-seg__btn {
+  font-family: var(--mf-display);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.mf-seg__btn.is-active {
+  font-weight: 700;
+}
+
+/* ------------------------------- cards ------------------------------- */
+
+/* La carte n'est plus un panneau : juste l'affiche, et le texte dessous. */
+.mf-card__inner {
+  background: transparent;
+  overflow: visible;
+}
+
+.mf-card__poster {
+  border-radius: var(--mf-radius);
+  background: var(--mf-surface-2);
+  box-shadow: none;
+}
+
+.mf-card__poster::after {
+  background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.6) 100%);
+}
+
+.mf-card__body {
+  min-height: 0;
+  padding: 0.55rem 0.1rem 0;
+}
+
+.mf-card__title {
+  height: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+  -webkit-line-clamp: 1;
+}
+
+/* « Film • 2026 », en rouge, comme la référence. */
+.mf-card__meta {
+  margin-top: 0.2rem;
+  color: var(--mf-accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.mf-card--silver .mf-card__meta::before {
+  content: "Film  •  ";
+  white-space: pre;
+}
+
+.mf-card--cobalt .mf-card__meta::before {
+  content: "Série  •  ";
+  white-space: pre;
+}
+
+.mf-card--amethyst .mf-card__meta::before {
+  content: "Anime  •  ";
+  white-space: pre;
+}
+
+/* Le type est déjà dans la ligne rouge : le badge sur l'affiche est en trop. */
+.mf-card__badge {
+  display: none;
+}
+
+.mf-card__play {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.mf-card__play svg {
+  border: 0;
+  background: var(--mf-accent);
+  box-shadow: 0 8px 24px rgba(229, 9, 20, 0.45);
+}
+
+.mf-card__watch {
+  border-color: transparent;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mf-card:hover,
+  .mf-card:focus-within {
+    transform: translateY(-4px);
+  }
+
+  .mf-card:hover .mf-card__inner,
+  .mf-card:focus-within .mf-card__inner {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .mf-card:hover .mf-card__poster,
+  .mf-card:focus-within .mf-card__poster {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 18px 36px rgba(0, 0, 0, 0.6);
+  }
+
+  .mf-card:hover .mf-card__title {
+    color: #fff;
+  }
+}
+
+/* ------------------------------ top 10 ------------------------------- */
+
+.mf-top__head h2 {
+  font-size: 0.86rem;
+}
+
+.mf-top__rank {
+  font-family: var(--mf-display);
+  font-weight: 800;
+  line-height: 0.85;
+  letter-spacing: -0.04em;
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.55);
+  margin-right: 0.1rem;
+}
+
+.mf-top__card {
+  border: 0;
+  border-radius: var(--mf-radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.mf-top__card:hover,
+.mf-top__card:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+
+.mf-top__title {
+  font-family: var(--mf-display);
+  font-weight: 800;
+  font-size: clamp(0.95rem, 1.4vw, 1.2rem);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  text-align: left;
+  padding: 0.6rem 0.85rem 0.7rem;
+}
+
+.mf-top__meta {
+  font-size: 0.74rem;
+}
+
+/* --------------------------- studios tiles --------------------------- */
+
+.mf-studio {
+  border-radius: var(--mf-radius);
+}
+
+.mf-studio:hover,
+.mf-studio:focus-visible {
+  transform: translateY(-3px);
+}
+
+/* ------------------------------- resume ------------------------------ */
+
+.mf-resume__card {
+  border-radius: var(--mf-radius);
+}
+
+@media (max-width: 640px) {
+  .mf-top__rank {
+    margin-right: -0.4rem;
+  }
+
+  .mf-hero__title {
+    font-size: clamp(1.9rem, 8.4vw, 2.6rem);
+  }
+}

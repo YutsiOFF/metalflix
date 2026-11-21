@@ -1,25 +1,33 @@
 /**
- * Short descriptions for the few titles in the hero.
+ * Real plot summaries for the titles in the hero.
  *
  * Moviez serves plays, not text: its catalogue carries a poster, a title and a
- * year, and `/api/check` returns the same four fields. The paragraph therefore
- * comes from the French Wikipedia article attached to the TMDB id in Wikidata;
- * when there is no article, Wikidata's own one-line description stands in
- * ("mini-série américaine de science-fiction"). Two requests for all six
- * titles, cached for the session so a rotation costs nothing. No key, no
- * backend, and no invented synopsis: a title with neither shows no text.
+ * year, and its viewer page has no description at all. The Wikipedia *intro*
+ * was standing in, but it reads like a record card — "X est un film américain
+ * réalisé par…" — instead of telling what the film is about. This reads the
+ * article's "Synopsis" / "Intrigue" section instead, which is the plot.
+ *
+ * The TMDB id is resolved to a French Wikipedia article through Wikidata, one
+ * cached SPARQL query for all six titles. A title with no synopsis section
+ * falls back to Wikidata's one-line description; nothing is invented.
  */
 
 const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
 const WIKI_API = "https://fr.wikipedia.org/w/api.php";
-const CACHE_KEY = "metalflix.synopses";
-const MAX_CHARS = 320;
+/** v2: the cache used to hold article intros, which read like record cards. */
+const CACHE_KEY = "metalflix.synopsis.v2";
+const MAX_CHARS = 420;
 
 type Cache = Record<string, string>;
 type Lookup = { article?: string; description?: string };
 interface Entry {
   id: number;
   series: boolean;
+}
+
+interface Section {
+  index: string;
+  line: string;
 }
 
 function readCache(): Cache {
@@ -38,11 +46,16 @@ function writeCache(cache: Cache) {
   }
 }
 
+async function wikiJson(url: string): Promise<Record<string, unknown>> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`wiki ${res.status}`);
+  return (await res.json()) as Record<string, unknown>;
+}
+
 /**
  * TMDB id → French Wikipedia article and/or Wikidata description. Films and
  * series use different TMDB id spaces that overlap numerically, so each id is
- * looked up through the property matching what the catalogue says it is —
- * otherwise a 2026 cartoon would inherit the description of a 1993 film.
+ * looked up through the property matching what the catalogue says it is.
  */
 async function lookupFor(entries: Entry[]): Promise<Map<number, Lookup>> {
   const films = entries.filter((entry) => !entry.series).map((entry) => `"${entry.id}"`);
@@ -85,55 +98,67 @@ async function lookupFor(entries: Entry[]): Promise<Map<number, Lookup>> {
   return found;
 }
 
-/** Article titles → intro paragraphs, one batched call. */
-async function extractsFor(titles: string[]): Promise<Map<string, string>> {
-  const url =
-    `${WIKI_API}?action=query&format=json&origin=*&prop=extracts&exintro=1&explaintext=1&redirects=1` +
-    `&titles=${encodeURIComponent(titles.join("|"))}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`wiki ${res.status}`);
-
-  const data = (await res.json()) as {
-    query?: {
-      pages?: Record<string, { title: string; extract?: string }>;
-      normalized?: { from: string; to: string }[];
-      redirects?: { from: string; to: string }[];
-    };
-  };
-
-  const byTitle = new Map<string, string>();
-  for (const page of Object.values(data.query?.pages ?? {})) {
-    if (page.extract) byTitle.set(page.title, page.extract);
+/** Article HTML → one readable paragraph. */
+function toPlain(html: string): string {
+  // Parsing beats stripping tags here: the media boxes, infoboxes and gallery
+  // captions become elements we can remove whole, instead of leaking in as
+  // "Affiche officielle sur Allociné, Bande-annonce officielle sur…".
+  if (typeof DOMParser === "undefined") {
+    return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   }
-
-  // A requested title can come back renamed (accents, redirects).
-  const resolve = (title: string) => {
-    let current = title;
-    for (let hop = 0; hop < 3; hop += 1) {
-      const next =
-        data.query?.normalized?.find((entry) => entry.from === current)?.to ??
-        data.query?.redirects?.find((entry) => entry.from === current)?.to;
-      if (!next) break;
-      current = next;
-    }
-    return current;
-  };
-
-  const extracts = new Map<string, string>();
-  for (const title of titles) {
-    const text = byTitle.get(resolve(title));
-    if (text) extracts.set(title, text);
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const noise = doc.querySelectorAll(
+      "script, style, sup, figure, table, h2, h3, h4, h5, .thumb, .gallery, .gallerytext, .navbox, " +
+        ".infobox, .hatnote, .mw-editsection, .reference, .mw-references-wrap, .metadata, .side-box, " +
+        ".module-medias, .mediaContainer, .mw-halign-right",
+    );
+    for (let i = 0; i < noise.length; i += 1) noise[i].remove();
+    return (doc.body?.textContent ?? "").replace(/\s+/g, " ").trim();
+  } catch {
+    return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   }
-  return extracts;
 }
 
-/** Keep two sentences at most: the hero is a teaser, not the article. */
+/** Drops the section title and the "Article détaillé" line that open it. */
+function stripOpening(text: string): string {
+  return text
+    .replace(/^(synopsis|intrigue|r[ée]sum[ée]|argument|histoire)\b[\s:–—-]*/i, "")
+    .replace(/^(article d[ée]taill[ée]\s*:[^.]*\.|pour plus de d[ée]tails[^.]*\.)\s*/i, "")
+    .trim();
+}
+
+/** Keep the opening of the plot, up to two sentences or the character budget. */
 function shorten(text: string): string {
   const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return "";
   if (clean.length <= MAX_CHARS) return clean;
   const cut = clean.slice(0, MAX_CHARS);
   const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
-  return end > 120 ? cut.slice(0, end + 1) : `${cut.trimEnd()}…`;
+  return end > 140 ? cut.slice(0, end + 1) : `${cut.trimEnd()}…`;
+}
+
+const PLOT_SECTION = /^(synopsis|intrigue|r[ée]sum[ée]|argument|histoire)\b/i;
+
+/** The plot section of one article, or an empty string when it has none. */
+async function synopsisFor(article: string): Promise<string> {
+  const page = encodeURIComponent(article);
+  const sections = (await wikiJson(
+    // origin=* is what lets a static page read the API from the browser at all:
+    // without it Wikipedia answers without the CORS headers and every call fails.
+    `${WIKI_API}?action=parse&format=json&origin=*&prop=sections&redirects=1&page=${page}`,
+  )) as { parse?: { sections?: Section[] } };
+
+  const list = sections.parse?.sections ?? [];
+  // Exact titles first ("Synopsis"), then anything that starts with one.
+  const target = list.find((entry) => PLOT_SECTION.test(entry.line) && entry.line.length < 24) ?? list.find((entry) => PLOT_SECTION.test(entry.line));
+  if (!target) return "";
+
+  const body = (await wikiJson(
+    `${WIKI_API}?action=parse&format=json&origin=*&prop=text&redirects=1&section=${target.index}&page=${page}`,
+  )) as { parse?: { text?: { "*"?: string } } };
+
+  return shorten(stripOpening(toPlain(body.parse?.text?.["*"] ?? "")));
 }
 
 function sentence(text: string): string {
@@ -160,15 +185,22 @@ export async function loadSynopses(entries: Entry[]): Promise<Record<number, str
 
   try {
     const found = await lookupFor(pending);
-    const articles = [...new Set([...found.values()].map((entry) => entry.article).filter(Boolean))] as string[];
-    const extracts = articles.length ? await extractsFor(articles) : new Map<string, string>();
+    const results = await Promise.all(
+      pending.map(async ({ id }) => {
+        const hit = found.get(id);
+        if (!hit) return [id, ""] as const;
+        if (!hit.article) return [id, hit.description ? sentence(hit.description) : ""] as const;
+        try {
+          const plot = await synopsisFor(hit.article);
+          // No plot section: the description beats the record-card intro.
+          return [id, plot || (hit.description ? sentence(hit.description) : "")] as const;
+        } catch {
+          return [id, hit.description ? sentence(hit.description) : ""] as const;
+        }
+      }),
+    );
 
-    for (const { id } of pending) {
-      const hit = found.get(id);
-      const paragraph = hit?.article ? extracts.get(hit.article) : undefined;
-      const text = paragraph ? shorten(paragraph) : hit?.description ? sentence(hit.description) : "";
-      cache[String(id)] = text;
-    }
+    for (const [id, text] of results) cache[String(id)] = text;
     writeCache(cache);
   } catch {
     // Offline or blocked: the hero reads fine without the paragraph.

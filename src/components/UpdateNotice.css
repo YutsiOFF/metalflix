@@ -1,0 +1,156 @@
+.mf-update {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--mf-nav-h) + env(safe-area-inset-top)) var(--mf-gutter) calc(1.5rem + env(safe-area-inset-bottom));
+  background: rgba(5, 5, 7, 0.74);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: mf-update-in 220ms var(--mf-ease-out) both;
+}
+
+/* The card scrolls in its middle, never under its footer: the list is the
+   only scrollable part, so « C'est noté » stays reachable on a short window. */
+.mf-update__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  max-height: min(78vh, 620px);
+  overflow: hidden;
+  padding: clamp(1.25rem, 3vw, 1.9rem);
+  border: 1px solid var(--mf-line-strong);
+  border-radius: var(--mf-radius-l);
+  background: linear-gradient(165deg, var(--mf-surface-2), var(--mf-bg) 72%);
+  box-shadow: var(--mf-shadow-2);
+  animation: mf-update-pop 260ms var(--mf-ease-out) both;
+}
+
+.mf-update__close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--mf-line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--mf-text-2);
+  cursor: pointer;
+  transition: background 160ms var(--mf-ease), color 160ms var(--mf-ease);
+}
+
+.mf-update__close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--mf-text);
+}
+
+.mf-update__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: var(--mf-accent-soft);
+  color: #ff8a92;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mf-update__card h2 {
+  margin: 0.75rem 0 1.1rem;
+  font-size: clamp(1.25rem, 1rem + 1.2vw, 1.6rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.mf-update__list {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0 0 1.35rem;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.mf-update__list li {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr;
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.mf-update__icon {
+  font-size: 1.1rem;
+  line-height: 1.45;
+}
+
+.mf-update__list strong {
+  display: block;
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: var(--mf-text);
+}
+
+.mf-update__list p {
+  margin: 0.15rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--mf-text-3);
+}
+
+.mf-update__ok {
+  flex: none;
+  width: 100%;
+  padding: 0.72rem 1rem;
+  border: 0;
+  border-radius: var(--mf-radius);
+  background: var(--mf-accent);
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms var(--mf-ease);
+}
+
+.mf-update__ok:hover {
+  background: var(--mf-accent-hover);
+}
+
+@keyframes mf-update-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes mf-update-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-update,
+  .mf-update__card {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .mf-update {
+    padding: calc(var(--mf-nav-h) + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .mf-update__card {
+    max-height: 80vh;
+  }
+}

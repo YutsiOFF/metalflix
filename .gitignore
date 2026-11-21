@@ -7,6 +7,12 @@ scripts/verify-results*.json
 .env.*
 .DS_Store
 
+# URL du webhook Discord (secret)
+.discord-webhook
+
+# Clé Watchmode (secret, téléversée en secret du Worker)
+.watchmode-key
+
 # Données de collecte (régénérables)
 .cache/
 

@@ -1,0 +1,47 @@
+{
+  "components": [
+    {
+      "type": 17,
+      "accent_color": 15010068,
+      "components": [
+        {
+          "type": 10,
+          "content": "@everyone\n## Correctifs du 17 novembre 2026\nDeux bugs de reprise et d'historique, corrigés et vérifiés en ligne. **[Ouvrir MetalFlix](https://yutsioff.github.io/metalflix/)**"
+        },
+        {
+          "type": 14,
+          "spacing": 1,
+          "divider": true
+        },
+        {
+          "type": 10,
+          "content": "### 🐛 Corrigé\n- **La reprise ne repart plus de zéro.** Un film arrêté au milieu se relançait parfois du début : sa position était effacée à l'ouverture, puis un enregistrement à 0,1 s prenait le dessus. Ouvrir un film garde maintenant son point de reprise, la bibliothèque refuse d'écraser une vraie position par un démarrage à zéro, et le lecteur n'enregistre rien avant d'avoir rejoint la position sauvegardée.\n- **Les films ne disparaissent plus de « Reprendre ».** Un titre quittait la rangée dès 95 % de visionnage, et un simple saut vers le générique suffisait. Seul un film réellement terminé en sort désormais."
+        },
+        {
+          "type": 14,
+          "spacing": 1,
+          "divider": true
+        },
+        {
+          "type": 10,
+          "content": "### ✅ Vérifié\n- Arrêt à la moitié, fermeture immédiate, réouverture : le film repart à **4 583 s sur 9 133 s**, pile la moitié.\n- Ouverture depuis le catalogue qui démarre au début : la position sauvegardée n'est plus écrasée."
+        },
+        {
+          "type": 10,
+          "content": "### 🙏 Merci\nMerci pour le détail des trois ouvertures : c'est exactement ce qui a permis de trouver la vraie cause, un enregistrement qui partait avant la reprise."
+        },
+        {
+          "type": 14,
+          "spacing": 1,
+          "divider": true
+        },
+        {
+          "type": 10,
+          "content": "-# 100 % gratuit, sans compte · <https://yutsioff.github.io/metalflix/>"
+        }
+      ],
+      "spoiler": false
+    }
+  ],
+  "flags": 32768
+}

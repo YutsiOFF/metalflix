@@ -36,15 +36,15 @@ export default function DirectLookup({ id, onPlay }: DirectLookupProps) {
     <MetalCard tone="gold" radius={18} sheen className="mf-lookup" halo>
       <div className="mf-lookup__body">
         <p className="mf-lookup__tag">
-          <Search size={13} /> Recherche directe TMDB
+          <Search size={13} /> Recherche directe
         </p>
-        {state.status === "loading" && <p className="mf-lookup__text">Interrogation de Moviez pour l'id {id}…</p>}
+        {state.status === "loading" && <p className="mf-lookup__text">Recherche du titre {id}…</p>}
         {state.status === "missing" && (
           <p className="mf-lookup__text">
-            L'id <strong>{id}</strong> n'est pas disponible sur Moviez.
+            Le titre <strong>{id}</strong> n'est pas disponible dans le lecteur.
           </p>
         )}
-        {state.status === "error" && <p className="mf-lookup__text">Impossible de joindre l'API Moviez.</p>}
+        {state.status === "error" && <p className="mf-lookup__text">Le lecteur ne répond pas pour le moment.</p>}
         {state.status === "ready" && data && (
           <>
             <h3 className="mf-lookup__title">{data.title}</h3>
@@ -59,7 +59,7 @@ export default function DirectLookup({ id, onPlay }: DirectLookupProps) {
                 onPlay({
                   id: data.tmdb_id ?? id,
                   type: data.detectedType === "series" ? "series" : "movie",
-                  title: data.title ?? `TMDB ${id}`,
+                  title: data.title ?? `Titre ${id}`,
                   seasons: data.seasons,
                   languages: data.languages,
                 })

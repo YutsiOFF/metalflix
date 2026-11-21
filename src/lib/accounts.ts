@@ -70,6 +70,13 @@ function normalizeName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
+/** `crypto.randomUUID` arrived in Chrome 92 — not on most smart TVs. */
+function newId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export async function signUp(name: string, password: string): Promise<Profile> {
   const clean = normalizeName(name);
   if (clean.length < 2) throw new Error("Choisissez un nom d'au moins 2 caractères.");
@@ -80,7 +87,7 @@ export async function signUp(name: string, password: string): Promise<Profile> {
   }
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const profile: Profile = {
-    id: crypto.randomUUID(),
+    id: newId(),
     name: clean,
     createdAt: Date.now(),
     password: { salt: toBase64(salt), hash: await stretch(password, salt, ITERATIONS), iterations: ITERATIONS },

@@ -57,8 +57,61 @@ export function playerUrl({ id, type, lang, season = 1, episode = 1, autoplay = 
   if (autoplay) params.set("autoplay", "1");
   const route = type === "series" ? `serie/${id}/${season}/${episode}` : `${id}`;
   const query = params.toString();
-  const base = PLAYER_PROXY ? `${PLAYER_PROXY}/p` : API_BASE;
-  return `${base}/${route}${query ? `?${query}` : ""}`;
+  // Played straight from Moviez, on their own origin: the page reaches its own
+  // API there, the video streams from their CDN, and none of it goes through our
+  // hosted proxy — which is the only thing that had a daily request allowance.
+  return `${API_BASE}/${route}${query ? `?${query}` : ""}`;
+}
+
+export interface MoviezStream {
+  hls: string;
+  duration: number | null;
+}
+
+/**
+ * The source really has no file for this title: not an outage, and not a
+ * signature that expired. Asking again returns the same void, so the player has
+ * to say so instead of inviting a retry that can never succeed.
+ */
+export class NoStreamError extends Error {
+  constructor(message = "Aucun flux pour ce titre") {
+    super(message);
+    this.name = "NoStream";
+  }
+}
+
+/**
+ * Play inside our own player.
+ *
+ * The player page carries a short-lived token (`window.P2.t`) that its stream
+ * endpoint trades for a signed HLS URL — and that endpoint answers 403 to every
+ * origin but its own, a header a browser cannot fake. So our Worker makes that
+ * one request on the site's behalf; the playlist and every segment then come
+ * straight from Moviez's CDN, which allows our origin. Playback therefore runs
+ * on MetalFlix itself, with our controls and no ad page, and the hosted relay
+ * only ever sees one request per playback instead of one per segment.
+ */
+export async function resolveStream(target: PlayerTarget & { signal?: AbortSignal }): Promise<MoviezStream> {
+  const { signal, ...rest } = target;
+  const page = await fetch(playerUrl({ ...rest, autoplay: false }), { signal });
+  if (!page.ok) throw new Error(`Moviez a répondu ${page.status}`);
+
+  const raw = /window\.P2\s*=\s*(\{.*?\})\s*;/.exec(await page.text())?.[1];
+  const token = raw ? (JSON.parse(raw) as { t?: string }).t : "";
+  if (!token) throw new Error("Jeton de lecture introuvable");
+
+  const relay = await fetch(`${PLAYER_PROXY}/mz?t=${encodeURIComponent(token)}`, { signal });
+  const body = await relay.text();
+  if (!relay.ok) {
+    // The relay answers "Aucun flux" when the title has no file at all; every
+    // other failure is the relay itself and deserves a retry.
+    if (/aucun flux/i.test(body)) throw new NoStreamError();
+    throw new Error(`Relais ${relay.status}`);
+  }
+  const data = JSON.parse(body) as { hls?: string; duration?: number | null };
+  if (!data.hls) throw new NoStreamError();
+
+  return { hls: data.hls, duration: data.duration ?? null };
 }
 
 export const LANG_LABEL: Record<string, string> = {
@@ -69,3 +122,22 @@ export const LANG_LABEL: Record<string, string> = {
   en: "EN",
   ja: "JA",
 };
+
+/** Anime-Sama is resolved by our own Worker: seasons/versions, then playback. */
+export function animeSamaInfoUrl(slug: string): string {
+  return `${PLAYER_PROXY}/as/info?slug=${encodeURIComponent(slug)}`;
+}
+
+export function animeSamaPlayerUrl({
+  slug,
+  saison,
+  version,
+  episode,
+}: {
+  slug: string;
+  saison: string;
+  version: string;
+  episode: number;
+}): string {
+  return `${PLAYER_PROXY}/as/p/${encodeURIComponent(slug)}/${encodeURIComponent(saison)}/${encodeURIComponent(version)}/${episode}`;
+}

@@ -6,7 +6,9 @@
 //  2. the bulk harvest of /api/browse (.cache/browse-*.json).
 //
 // Rows are emitted as compact tuples to keep the bundle small:
-//   [tmdbId, title, year, code, posterPath]  with code 0=film 1=série 2=anime
+//   [tmdbId, title, year, code, posterPath, genreMask, platformMask, alias?]
+// with code 0=film 1=série 2=anime and alias the API title when the French one
+// replaced it (search matches both).
 //
 // Run: node scripts/wikidata.mjs && node scripts/harvest.mjs && node scripts/build-catalog.mjs
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -60,12 +62,33 @@ const RENAME = { 11: "La Guerre des étoiles" };
 const notableFilms = new Set(await readJson("../.cache/wd-films.json", []));
 const notableSeries = new Set(await readJson("../.cache/wd-series.json", []));
 const animeIds = new Set(await readJson("../.cache/wd-anime.json", []));
+// Anime-Sama's catalogue (scripts/harvest-animesama.mjs) is a second opinion on
+// what counts as an anime: Wikidata misses a lot of series that never got an
+// item, and those used to land in "Films" or "Séries".
+const animeNames = new Set(
+  (await readJson("../.cache/animesama.json", [])).map((item) => normalizeTitle(item.name)),
+);
 const genreMasks = (await readJson("../.cache/genres.json", { masks: {} })).masks ?? {};
+// Streaming platforms in France, one bit each (scripts/providers.mjs).
+const platformMasks = (await readJson("../.cache/providers.json", { masks: {} })).masks ?? {};
 
 const movies = await readJson("../.cache/browse-movie.json", []);
 const shows = await readJson("../.cache/browse-tv.json", []);
+// French titles (scripts/titles-fr.mjs). The source carries the English name
+// for a lot of entries, and nobody searches "Tangled" for Raiponce.
+const titlesFr = await readJson("../.cache/titles-fr.json", {});
 
 const posterPath = (url) => String(url).replace(/^https?:\/\/image\.tmdb\.org\/t\/p\/w\d+\//, "");
+
+/** Accents, punctuation and case removed, so "L'Attaque des Titans" matches. */
+function normalizeTitle(value) {
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
 
 const seen = new Set();
 const rows = [];
@@ -99,20 +122,54 @@ for (const item of [...movies, ...shows]) {
     // A TMDB id is one thing or the other, but the API's two browse lists
     // overlap: an anime series also showed up among the movies, so the anime
     // flag wins over the list it came from.
-    code: animeIds.has(id) ? 2 : isTv ? 1 : 0,
+    // A TMDB id is one thing or the other, but the API's two browse lists
+    // overlap: an anime series also showed up among the movies, so the anime
+    // flag wins over the list it came from.
+    // A matching Anime-Sama title is not enough on its own: live-action
+    // adaptations share the name (One Piece, Death Note, Bleach…). Requiring the
+    // Animation genre keeps those in Films/Séries where they belong.
+    code:
+      animeIds.has(id) || ((genreMasks[id] ?? 0) & 4 && animeNames.has(normalizeTitle(item.title))) ? 2 : isTv ? 1 : 0,
     poster: posterPath(item.poster),
     notable: isTv ? notableSeries.has(id) : notableFilms.has(id),
   });
 }
 
+// Films Moviez plays but /api/browse has not listed yet (scripts/extra-films.mjs):
+// they are already checked as available, so they join as ordinary films.
+const extras = await readJson("../.cache/extra-films.json", []);
+for (const item of extras) {
+  const id = Number(item.id);
+  if (!id || seen.has(id) || !item.poster || !item.year || !item.title) continue;
+  seen.add(id);
+  rows.push({
+    id,
+    title: item.title,
+    year: item.year,
+    code: 0,
+    poster: posterPath(item.poster),
+    notable: false,
+    alt: item.alt,
+  });
+}
+
 // Recognisable titles first, then newest; the bundle keeps no popularity field.
+// The French title wins on display, the source title stays as a search alias.
+for (const row of rows) {
+  const french = titlesFr[row.id];
+  if (!french?.t || normalizeTitle(french.t) === normalizeTitle(row.title)) continue;
+  if (!row.alt) row.alt = row.title;
+  row.title = french.t;
+}
+
 rows.sort((a, b) => Number(b.notable) - Number(a.notable) || b.year - a.year || a.title.localeCompare(b.title, "fr"));
 
-// The genre mask is appended only when it exists, so the untagged majority
-// stays as compact as before.
+// The genre and platform masks are always written now, so the optional search
+// alias has a stable slot at the end of the row.
 const compact = rows.map((row) => {
-  const mask = genreMasks[row.id] ?? 0;
-  return mask ? [row.id, row.title, row.year, row.code, row.poster, mask] : [row.id, row.title, row.year, row.code, row.poster];
+  const base = [row.id, row.title, row.year, row.code, row.poster, genreMasks[row.id] ?? 0, platformMasks[row.id] ?? 0];
+  if (row.alt) base.push(row.alt);
+  return base;
 });
 const ESSENTIAL = 14_000;
 
@@ -128,13 +185,26 @@ await writeFile(
   JSON.stringify(compact.slice(ESSENTIAL)) + "\n",
 );
 
+// Anime-Sama titles the Moviez catalogue does not carry at all. They are not
+// TMDB ids, so they get a high, unambiguous range and carry their slug — the
+// player resolves them through the Worker instead of the Moviez player.
+const knownTitles = new Set(rows.map((row) => normalizeTitle(row.title)));
+const animeSama = (await readJson("../.cache/animesama.json", []))
+  .filter((item) => item.cover && item.name && !knownTitles.has(normalizeTitle(item.name)))
+  .map((item, index) => [900_000_000 + index, item.name, item.slug, item.cover]);
+
+await writeFile(new URL("../src/data/animesama.json", import.meta.url), JSON.stringify(animeSama) + "\n");
+
 const counts = rows.reduce(
   (acc, row) => ({ ...acc, [["film", "serie", "anime"][row.code]]: (acc[["film", "serie", "anime"][row.code]] ?? 0) + 1 }),
   {},
 );
 console.log(`catalogue: ${rows.length} titres`, counts);
+console.log(`animes Anime-Sama en plus: ${animeSama.length}`);
 const tagged = rows.filter((row) => genreMasks[row.id]).length;
+const onPlatform = rows.filter((row) => platformMasks[row.id]).length;
 const head = compact.slice(0, ESSENTIAL).length;
 console.log(
   `taille: premier chunk ${head} titres · notables: ${rows.filter((r) => r.notable).length} · genre: ${tagged}`,
 );
+console.log(`plateformes: ${onPlatform} titres sur Netflix/Prime/Disney+/Paramount+/Canal+/Apple TV+`);

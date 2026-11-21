@@ -104,14 +104,6 @@ export default function Hero({ items, onPlay }: HeroProps) {
           <button type="button" className="mf-btn mf-btn--primary" onClick={() => onPlay(item)}>
             <Play size={17} strokeWidth={2.4} /> Lecture
           </button>
-          <a
-            className="mf-link"
-            href={`https://api.moviez.ac/api/check/${item.id}`}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            Fiche API
-          </a>
         </div>
       </div>
 

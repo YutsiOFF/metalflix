@@ -81,7 +81,12 @@ export function recordWatch(profileId: string, entry: Omit<HistoryEntry, "at">, 
   const library = readLibrary(profileId);
   const previous = library.history.find((item) => item.id === entry.id);
   const rest = library.history.filter((item) => item.id !== entry.id);
-  const history = [{ ...entry, done: entry.done ?? previous?.done ?? false, at }, ...rest].slice(0, MAX_HISTORY);
+  // Opening a title rewrites its entry without a position; the previous one
+  // must survive, or a film loses its resume point the moment it is reopened.
+  const history = [
+    { ...entry, progress: entry.progress ?? previous?.progress, done: entry.done ?? previous?.done ?? false, at },
+    ...rest,
+  ].slice(0, MAX_HISTORY);
   return write(profileId, { ...library, history });
 }
 
@@ -113,6 +118,12 @@ export function recordProgress(
   const current = library.history[index];
   const season = position.season ?? current.season;
   const episode = position.episode ?? current.episode;
+  const moved = season !== current.season || episode !== current.episode;
+  // A player opened and closed straight away reports a few seconds of the
+  // file — 0, 0.004, sometimes 0.02. That is not "went back to the start", it
+  // is "never left": a real position must survive it. Changing episode is the
+  // one case where a fresh start is real.
+  if (!moved && ratio < 0.03 && (current.progress ?? 0) > 0.05) return library;
   if (current.progress === ratio && current.season === season && current.episode === episode) return library;
 
   const history = [...library.history];

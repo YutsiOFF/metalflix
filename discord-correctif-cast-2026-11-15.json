@@ -1,0 +1,28 @@
+{
+  "components": [
+    {
+      "type": 17,
+      "components": [
+        {
+          "type": 10,
+          "content": "@everyone 📺 **Le cast est réparé**"
+        },
+        {
+          "type": 14
+        },
+        {
+          "type": 10,
+          "content": "Le bouton **Caster** renvoie de nouveau la liste des télés : Chrome sur PC et sur Android, AirPlay sur iPhone.\n\n• Après un premier envoi, le lecteur se croyait encore en train de caster et ne redemandait plus rien à Chrome.\n• Arrêter un cast puis en relancer un ne rallumait pas le sélecteur : il repart maintenant de zéro.\n• Le film part avec ses sous-titres, et le panneau inutile a disparu."
+        },
+        {
+          "type": 14
+        },
+        {
+          "type": 10,
+          "content": "Testez sur votre télé et dites-moi ce que Chrome affiche : c'est le seul point que je ne peux pas vérifier sans écran à la maison."
+        }
+      ]
+    }
+  ],
+  "flags": 32768
+}

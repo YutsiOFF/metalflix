@@ -4,6 +4,8 @@ import { Check, ChevronDown } from "lucide-react";
 export interface DropdownOption {
   value: string;
   label: string;
+  /** Shorter text for the closed button, where the header has no room to spare. */
+  compact?: string;
   count?: number;
 }
 
@@ -82,7 +84,7 @@ export default function Dropdown({ label, value, options, onChange }: DropdownPr
           }
         }}
       >
-        {selected?.label ?? "—"}
+        {selected?.compact ?? selected?.label ?? "—"}
         <ChevronDown size={13} className="mf-select__chev" aria-hidden="true" />
       </button>
 
