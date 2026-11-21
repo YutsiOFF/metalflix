@@ -16,6 +16,8 @@ export interface Credit {
   name: string;
   /** Empty when the article lists the actor without a role. */
   role: string;
+  /** Portrait from Wikimedia Commons (Wikidata P18), when the actor has one. */
+  photo?: string;
 }
 
 export interface TitleDetails {
@@ -30,7 +32,7 @@ export interface TitleDetails {
 
 const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
 const WIKI_API = "https://fr.wikipedia.org/w/api.php";
-const CACHE_KEY = "metalflix.details.v3";
+const CACHE_KEY = "metalflix.details.v4";
 /** The sheet has room for a real paragraph, unlike the hero one-liner. */
 const PLOT_CHARS = 1100;
 const MAX_CREDITS = 14;
@@ -139,6 +141,51 @@ SELECT ?article ?directorLabel ?duration ?description WHERE {
     if (!found.description && row.description) found.description = row.description.value;
   }
   return found;
+}
+
+/** "Sandra Hüller" and "sandra huller" are the same person. */
+function nameKey(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * The cast as Wikidata knows it (P161), with each actor's portrait (P18) from
+ * Wikimedia Commons, served as a small thumbnail. Keyless and CORS-open.
+ */
+async function castPart(entry: Entry): Promise<{ name: string; photo: string }[]> {
+  const property = entry.series ? "P4983" : "P4947";
+  const query = `PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?actor ?fr ?en ?image WHERE {
+  ?item wdt:${property} "${entry.id}"; wdt:P161 ?actor.
+  OPTIONAL { ?actor wdt:P18 ?image }
+  OPTIONAL { ?actor rdfs:label ?fr. FILTER(LANG(?fr) = "fr") }
+  OPTIONAL { ?actor rdfs:label ?en. FILTER(LANG(?en) = "en") }
+} LIMIT 120`;
+  const res = await fetch(`${SPARQL_ENDPOINT}?format=json&query=${encodeURIComponent(query)}`, {
+    headers: { accept: "application/sparql-results+json" },
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results: { bindings: { actor: { value: string }; fr?: { value: string }; en?: { value: string }; image?: { value: string } }[] };
+  };
+  const byActor = new Map<string, { name: string; photo: string }>();
+  for (const row of data.results.bindings) {
+    const name = row.fr?.value || row.en?.value || "";
+    if (!name) continue;
+    const known = byActor.get(row.actor.value);
+    const photo = row.image?.value
+      ? `${row.image.value.replace(/^http:/, "https:")}?width=240`
+      : "";
+    if (!known) byActor.set(row.actor.value, { name, photo });
+    else if (!known.photo && photo) known.photo = photo;
+  }
+  return [...byActor.values()];
 }
 
 /** Section HTML → readable text, with the boxes and notes that leak captions removed. */
@@ -340,7 +387,7 @@ export async function loadDetails(entry: Entry): Promise<TitleDetails> {
   const hit = cache[key];
   if (hit) return hit;
 
-  const [wiki, trailer] = await Promise.all([
+  const [wiki, trailer, cast] = await Promise.all([
     entry.skipWiki
       ? Promise.resolve(null)
       : (async (): Promise<Partial<TitleDetails> | null> => {
@@ -362,11 +409,28 @@ export async function loadDetails(entry: Entry): Promise<TitleDetails> {
           }
         })(),
     trailerFor(entry.title).catch(() => ""),
+    entry.skipWiki ? Promise.resolve([]) : castPart(entry).catch(() => []),
   ]);
+
+  // The article gives the billing order and the roles; Wikidata gives faces.
+  // Names are matched loosely (accents, case); with no article list at all,
+  // Wikidata's own cast list (photos first) stands in.
+  const photos = new Map(cast.map((actor) => [nameKey(actor.name), actor.photo]));
+  let credits: Credit[] = (wiki?.credits ?? []).map((credit) => ({
+    ...credit,
+    photo: photos.get(nameKey(credit.name)) || undefined,
+  }));
+  if (!credits.length && cast.length) {
+    credits = [...cast]
+      .sort((a, b) => Number(Boolean(b.photo)) - Number(Boolean(a.photo)))
+      .slice(0, MAX_CREDITS)
+      .map((actor) => ({ name: actor.name, role: "", photo: actor.photo || undefined }));
+  }
 
   const details: TitleDetails = {
     ...EMPTY,
     ...(wiki ?? {}),
+    credits,
     trailer: trailer || "",
   };
 

@@ -1433,3 +1433,367 @@ body {
     font-size: 0.78rem;
   }
 }
+
+/* ------------------------------ fiche titre --------------------------- */
+
+.mf-modal__panel--detail {
+  width: min(72rem, 100%);
+  border: 0;
+  border-radius: 16px;
+  background: var(--mf-bg);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.75);
+}
+
+.mf-detail__hero {
+  aspect-ratio: auto;
+  height: clamp(24rem, 62vh, 36rem);
+  max-height: none;
+  background: var(--mf-bg);
+}
+
+.mf-detail__still {
+  object-position: center 20%;
+  animation-duration: 30s;
+}
+
+/* Mêmes fondus que la vedette : rien ne se coupe, tout finit dans le fond. */
+.mf-detail__shade {
+  background:
+    linear-gradient(0deg, rgb(var(--mf-bg-rgb)) 0%, rgba(var(--mf-bg-rgb), 0.75) 26%, rgba(var(--mf-bg-rgb), 0) 62%),
+    linear-gradient(90deg, rgba(var(--mf-bg-rgb), 0.92) 0%, rgba(var(--mf-bg-rgb), 0.45) 40%, rgba(var(--mf-bg-rgb), 0) 70%);
+}
+
+.mf-detail__close {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.mf-detail__close:hover {
+  background: var(--mf-accent);
+}
+
+.mf-detail__headline {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 44rem;
+  padding: 0 clamp(1.25rem, 3.5vw, 2.75rem) 1.75rem;
+}
+
+.mf-detail__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.mf-detail__tag {
+  padding: 0.22rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.mf-detail__tag--kind {
+  background: var(--mf-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mf-detail__genre {
+  color: var(--mf-text-2);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.mf-detail__genre + .mf-detail__genre::before {
+  content: "•";
+  margin-right: 0.45rem;
+  color: var(--mf-text-3);
+}
+
+.mf-detail__title {
+  margin: 0 0 1.25rem;
+  font-family: var(--mf-font);
+  font-size: clamp(2rem, 4.4vw, 3.5rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
+}
+
+.mf-detail__teaser {
+  margin: 0 0 1.25rem;
+  max-width: 38rem;
+  color: var(--mf-text-2);
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mf-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.mf-detail__actions .mf-btn {
+  height: 3rem;
+  padding: 0 1.5rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.mf-detail__ghost {
+  border: 0;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.mf-detail__ghost:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.mf-detail__round {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.mf-detail__round:hover {
+  border-color: #fff;
+}
+
+.mf-detail__round.is-on {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+}
+
+/* Corps : synopsis + casting à gauche, fiche technique à droite. */
+.mf-detail__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: 2.5rem;
+  padding: 1.5rem clamp(1.25rem, 3.5vw, 2.75rem) 2.5rem;
+}
+
+.mf-detail__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  min-width: 0;
+}
+
+.mf-detail__h3 {
+  margin: 0 0 0.85rem;
+  color: #fff;
+  font-family: var(--mf-font);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  text-transform: uppercase;
+}
+
+.mf-detail__plot {
+  color: var(--mf-text-2);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* Le casting : une rangée de visages, comme sur une plateforme. */
+.mf-detail__cast ul.mf-castrow,
+.mf-castrow {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 7.25rem;
+  gap: 1rem;
+  margin: 0;
+  padding: 0 0 0.5rem;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.mf-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  text-align: center;
+}
+
+.mf-person__face {
+  display: grid;
+  place-items: center;
+  width: 6.25rem;
+  height: 6.25rem;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #26262c, #141417);
+  color: var(--mf-text-3);
+  font-size: 1.35rem;
+  font-weight: 800;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+
+.mf-person__face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+}
+
+.mf-person__name {
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.mf-person__role {
+  color: var(--mf-text-3);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mf-detail__side dl {
+  margin: 0;
+  padding: 1.25rem;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mf-detail__side dt {
+  color: var(--mf-text-3);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.mf-detail__side dd {
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+/* Bande-annonce : à la demande, dans sa propre fenêtre, avec le son. */
+.mf-trailer {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: 3vh 3vw;
+}
+
+.mf-trailer__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.88);
+  cursor: pointer;
+}
+
+.mf-trailer__box {
+  position: relative;
+  width: min(64rem, 100%);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #000;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.8);
+}
+
+.mf-trailer__box iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.mf-trailer__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (max-width: 820px) {
+  .mf-detail__body {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+
+  .mf-detail__hero {
+    height: clamp(22rem, 58vh, 30rem);
+  }
+}
+
+@media (max-width: 520px) {
+  .mf-modal__panel--detail {
+    border-radius: 0;
+  }
+
+  .mf-detail__actions .mf-btn {
+    height: 2.75rem;
+    padding: 0 1.1rem;
+    font-size: 0.88rem;
+  }
+
+  .mf-detail__actions .mf-detail__play {
+    flex: 1 1 100%;
+  }
+
+  .mf-detail__round {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .mf-castrow {
+    grid-auto-columns: 6rem;
+  }
+
+  .mf-person__face {
+    width: 5.25rem;
+    height: 5.25rem;
+  }
+}
+
+.mf-detail__headline {
+  gap: 0;
+}

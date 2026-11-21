@@ -5,6 +5,7 @@ import {
   BookmarkCheck,
   Cast,
   Check,
+  Film,
   Maximize,
   Minimize,
   Pause,
@@ -137,7 +138,8 @@ export default function PlayerModal({
   const [fullscreen, setFullscreen] = useState(false);
   const [details, setDetails] = useState<TitleDetails | null>(null);
   const [backdrop, setBackdrop] = useState("");
-  const [muted, setMuted] = useState(true);
+  /** The trailer only plays when asked for, in its own layer (see sheet). */
+  const [trailerOpen, setTrailerOpen] = useState(false);
   const [reachable, setReachable] = useState<boolean | null>(null);
   const [checkTick, setCheckTick] = useState(0);
   // Signed HLS URL for the title being played; null while it is being fetched.
@@ -299,7 +301,7 @@ export default function PlayerModal({
     if (isSama) return () => {
       alive = false;
     };
-    loadBackdrops([subject.id]).then((map) => {
+    loadBackdrops([subject.id], subject.type === "series").then((map) => {
       if (alive) setBackdrop(map[String(subject.id)] ?? "");
     });
     return () => {
@@ -1036,11 +1038,10 @@ export default function PlayerModal({
 
   const kind = subject.category === "anime" ? "Anime" : subject.type === "series" ? "Série" : "Film";
   const trailer = details?.trailer ?? "";
-  // Muted autoplay is the one form every browser allows without a gesture; the
-  // sound button reloads the frame, since that parameter is read on load.
+  // No trailer playing behind the sheet any more (YouTube slipped its ads in
+  // there): the backdrop drifts instead, and the trailer opens on demand.
   const trailerSrc = trailer
-    ? `https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&mute=${muted ? 1 : 0}` +
-      `&controls=0&modestbranding=1&rel=0&loop=1&playlist=${trailer}&playsinline=1&iv_load_policy=3&disablekb=1&fs=0`
+    ? `https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3`
     : "";
   const still = backdrop || (subject.poster ? subject.poster.replace("/w500/", "/original/") : "");
 
@@ -1069,22 +1070,12 @@ export default function PlayerModal({
     };
   }, [src, checkTick, isSama]);
 
+  const genreNames = (subject.genres ?? []).slice(0, 3).map((key) => GENRE_LABEL[key]);
+
   const sheet = (
     <div className="mf-detail">
       <div className="mf-detail__hero">
-        {trailerSrc ? (
-          <iframe
-            key={trailerSrc}
-            className="mf-detail__trailer"
-            src={trailerSrc}
-            title={`Bande-annonce de ${subject.title}`}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            referrerPolicy="strict-origin-when-cross-origin"
-            tabIndex={-1}
-          />
-        ) : still ? (
-          <img className="mf-detail__still" src={still} alt="" decoding="async" />
-        ) : null}
+        {still ? <img className="mf-detail__still" src={still} alt="" decoding="async" /> : null}
         <div className="mf-detail__shade" aria-hidden="true" />
 
         <button type="button" className="mf-detail__close" onClick={onClose} aria-label="Fermer">
@@ -1092,23 +1083,16 @@ export default function PlayerModal({
         </button>
 
         <div className="mf-detail__headline">
-          <p className="mf-detail__eyebrow">
-            <span>{kind}</span>
-            {subject.year ? (
-              <>
-                <span className="mf-dot" />
-                <span>{subject.year}</span>
-              </>
-            ) : null}
-            {details?.runtime ? (
-              <>
-                <span className="mf-dot" />
-                <span>{details.runtime}</span>
-              </>
-            ) : null}
-            <span className="mf-dot" />
-            <span>{isSama ? "Anime-Sama" : "Moviez"}</span>
-          </p>
+          <div className="mf-detail__tags">
+            <span className="mf-detail__tag mf-detail__tag--kind">{kind}</span>
+            {subject.year ? <span className="mf-detail__tag">{subject.year}</span> : null}
+            {details?.runtime ? <span className="mf-detail__tag">{details.runtime}</span> : null}
+            {genreNames.map((name) => (
+              <span key={name} className="mf-detail__genre">
+                {name}
+              </span>
+            ))}
+          </div>
           <h2 className="mf-detail__title">{subject.title}</h2>
           <div className="mf-detail__actions">
             <button
@@ -1121,35 +1105,32 @@ export default function PlayerModal({
               {status === "unavailable" ? "Indisponible" : initial ? "Reprendre" : "Lecture"}
             </button>
             {trailerSrc ? (
-              <button
-                type="button"
-                className="mf-btn mf-detail__ghost"
-                onClick={() => setMuted((value) => !value)}
-                aria-pressed={!muted}
-              >
-                {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-                {muted ? "Activer le son" : "Couper le son"}
+              <button type="button" className="mf-btn mf-detail__ghost" onClick={() => setTrailerOpen(true)}>
+                <Film size={17} /> Bande-annonce
               </button>
             ) : null}
             {onToggleWatch ? (
               <button
                 type="button"
-                className={`mf-btn mf-detail__ghost${wanted ? " is-on" : ""}`}
+                className={`mf-detail__round${wanted ? " is-on" : ""}`}
                 aria-pressed={wanted}
                 onClick={() => onToggleWatch(subject)}
+                title={wanted ? "Retirer de ma liste" : "Ajouter à ma liste"}
+                aria-label={wanted ? "Retirer de ma liste" : "Ajouter à ma liste"}
               >
-                {wanted ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}
-                {wanted ? "Dans ma liste" : "Ma liste"}
+                {wanted ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
               </button>
             ) : null}
             {onToggleDone ? (
               <button
                 type="button"
-                className={`mf-btn mf-detail__ghost${done ? " is-on" : ""}`}
+                className={`mf-detail__round${done ? " is-on" : ""}`}
                 aria-pressed={done}
                 onClick={onToggleDone}
+                title={done ? "Marquer comme non vu" : "Marquer comme vu"}
+                aria-label={done ? "Marquer comme non vu" : "Marquer comme vu"}
               >
-                <Check size={17} /> {done ? "Vu" : "Marquer comme vu"}
+                <Check size={18} />
               </button>
             ) : null}
           </div>
@@ -1165,7 +1146,7 @@ export default function PlayerModal({
                 <p className="mf-detail__plot">{details.plot}</p>
               ) : (
                 <p className="mf-detail__plot mf-detail__plot--empty">
-                  Aucun synopsis publié pour ce titre. Le film reste disponible dans le lecteur.
+                  Aucun synopsis publié pour ce titre. Il reste disponible dans le lecteur.
                 </p>
               )
             ) : (
@@ -1179,17 +1160,19 @@ export default function PlayerModal({
 
           {details?.credits.length ? (
             <section className="mf-detail__cast">
-              <h3 className="mf-detail__h3">Distribution</h3>
-              <ul>
+              <h3 className="mf-detail__h3">Casting</h3>
+              <ul className="mf-castrow">
                 {details.credits.map((credit) => (
-                  <li key={`${credit.name}:${credit.role}`} className="mf-cast">
-                    <span className="mf-cast__badge" aria-hidden="true">
-                      {initials(credit.name)}
+                  <li key={`${credit.name}:${credit.role}`} className="mf-person">
+                    <span className="mf-person__face">
+                      {credit.photo ? (
+                        <img src={credit.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span aria-hidden="true">{initials(credit.name)}</span>
+                      )}
                     </span>
-                    <span className="mf-cast__text">
-                      <strong>{credit.name}</strong>
-                      {credit.role ? <span>{credit.role}</span> : null}
-                    </span>
+                    <strong className="mf-person__name">{credit.name}</strong>
+                    {credit.role ? <span className="mf-person__role">{credit.role}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -1230,6 +1213,29 @@ export default function PlayerModal({
           </dl>
         </aside>
       </div>
+
+      {trailerOpen && trailerSrc ? (
+        <div className="mf-trailer" role="dialog" aria-label={`Bande-annonce de ${subject.title}`}>
+          <button type="button" className="mf-trailer__backdrop" aria-label="Fermer" onClick={() => setTrailerOpen(false)} />
+          <div className="mf-trailer__box">
+            <button
+              type="button"
+              className="mf-trailer__close"
+              onClick={() => setTrailerOpen(false)}
+              aria-label="Fermer la bande-annonce"
+            >
+              <X size={18} />
+            </button>
+            <iframe
+              src={trailerSrc}
+              title={`Bande-annonce de ${subject.title}`}
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 
