@@ -6,6 +6,10 @@ import disneyLogo from "../assets/studios/disney.svg";
 import netflixLogo from "../assets/studios/netflix.svg";
 import paramountLogo from "../assets/studios/paramount.svg";
 import primeLogo from "../assets/studios/prime.svg";
+// Official marks from Wikimedia Commons: Marvel ships with the site, DC is the
+// Commons thumbnail of File:DC_Comics_logo.png (hotlinking is allowed there).
+import marvelLogo from "../assets/studios/marvel.svg";
+const DC_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/DC_Comics_logo.png/250px-DC_Comics_logo.png";
 
 interface StudioRailProps {
   /** Only the services that actually carry something, with their title count. */
@@ -34,10 +38,11 @@ const LOGO: Partial<Record<PlatformKey | string, string | null>> = {
 };
 
 /** The "Plateformes & studios" row: one brand tile per service carrying titles. */
-/** Marks drawn in CSS: the Marvel red block and the DC roundel. */
+/** The studios' own logos; Canal+ stays drawn in CSS. */
 function Wordmark({ studio }: { studio: string }) {
-  if (studio === "marvel") return <span className="mf-studio__marvel">MARVEL</span>;
-  if (studio === "dc") return <span className="mf-studio__dc">DC</span>;
+  if (studio === "marvel") return <img className="mf-studio__mark mf-studio__mark--marvel" src={marvelLogo} alt="" />;
+  if (studio === "dc")
+    return <img className="mf-studio__mark mf-studio__mark--dc" src={DC_LOGO} alt="" referrerPolicy="no-referrer" />;
   return (
     <span className="mf-studio__word" aria-hidden="true">
       CANAL+

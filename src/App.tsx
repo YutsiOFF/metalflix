@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Clapperboard, Film, Flame, LogIn, Menu, Search, Sparkles, Tv, X } from "lucide-react";
+import { Clapperboard, Film, Flame, Library as LibraryIcon, LogIn, Menu, Search, Sparkles, Tv, X } from "lucide-react";
 import {
   CATEGORY_LABEL,
   GENRE_LABEL,
@@ -23,6 +23,8 @@ import {
   type PlatformKey,
   type Title,
 } from "./lib/catalog";
+import { buildSagas, loadSagaSources, type SagaSource } from "./lib/sagas";
+import SagasPage from "./components/SagasPage";
 import { STUDIO_LABEL, STUDIO_ORDER, loadStudios, titleKey, type StudioKey, type StudioSets } from "./lib/studios";
 import { currentProfileId, listProfiles, signOut, type Profile } from "./lib/accounts";
 import {
@@ -55,7 +57,11 @@ import UpdateNotice from "./components/UpdateNotice";
 
 type Filter = Category | "all" | "nouveaute";
 type Sort = "default" | "recent" | "oldest";
-type Route = { name: "home" } | { name: "account" } | { name: "title"; id: number };
+type Route =
+  | { name: "home" }
+  | { name: "account" }
+  | { name: "sagas"; id: string | null }
+  | { name: "title"; id: number };
 
 const FILTERS: Filter[] = ["all", "film", "serie", "anime", "nouveaute"];
 const FILTER_LABEL: Record<Filter, string> = { ...CATEGORY_LABEL, nouveaute: "Nouveautés" };
@@ -110,6 +116,8 @@ function parseHash(): Route {
   const match = /^#\/t\/(\d+)/.exec(hash);
   if (match) return { name: "title", id: Number(match[1]) };
   if (hash.startsWith("#/compte")) return { name: "account" };
+  const saga = /^#\/sagas(?:\/(Q\d+))?/.exec(hash);
+  if (saga) return { name: "sagas", id: saga[1] ?? null };
   return { name: "home" };
 }
 
@@ -131,6 +139,34 @@ function subjectFor(catalog: Title[], id: number): PlaySubject | null {
 
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
+  // The page under an open title: the sheet opens over the sagas page too.
+  const [backPage, setBackPage] = useState<Route>(() => {
+    const first = parseHash();
+    return first.name === "title" ? { name: "home" } : first;
+  });
+  useEffect(() => {
+    if (route.name !== "title") setBackPage(route);
+  }, [route]);
+  const page = route.name === "title" ? backPage : route;
+
+  // Sagas load the first time the page is visited, then stay cached.
+  const [sagaSources, setSagaSources] = useState<SagaSource[] | null>(null);
+  const [sagasFailed, setSagasFailed] = useState(false);
+  useEffect(() => {
+    if (page.name !== "sagas" || sagaSources) return;
+    let alive = true;
+    setSagasFailed(false);
+    loadSagaSources()
+      .then((sources) => {
+        if (alive) setSagaSources(sources);
+      })
+      .catch(() => {
+        if (alive) setSagasFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [page.name, sagaSources]);
   const [filter, setFilter] = useState<Filter>("all");
   const [genre, setGenre] = useState<GenreKey | "all">("all");
   const [year, setYear] = useState<number | "all">("all");
@@ -174,6 +210,10 @@ export default function App() {
   const [library, setLibrary] = useState<Library>(() => readLibrary(profile ? profile.id : LOCAL_PROFILE_ID));
   const progressRef = useRef({ key: "", ratio: -1 });
   const [catalog, setCatalog] = useState<Title[]>([]);
+  const sagas = useMemo(
+    () => (sagaSources && catalog.length ? buildSagas(sagaSources, catalog) : null),
+    [sagaSources, catalog],
+  );
   const [loading, setLoading] = useState(true);
 
   // The hero: five of the best recent films, drawn again at every visit and,
@@ -466,7 +506,10 @@ export default function App() {
   function closePlayer() {
     setManual(null);
     setResume(null);
-    history.pushState("", document.title, `${window.location.pathname}${window.location.search}`);
+    // Back to the page the title was opened from (the sagas page keeps its hash).
+    const behind =
+      backPage.name === "sagas" ? `#/sagas${backPage.id ? `/${backPage.id}` : ""}` : "";
+    history.pushState("", document.title, `${window.location.pathname}${window.location.search}${behind}`);
     setRoute(parseHash());
   }
 
@@ -680,6 +723,13 @@ export default function App() {
         >
           <X size={16} />
         </button>
+        <a
+          className={`mf-header__link${page.name === "sagas" ? " is-active" : ""}`}
+          href="#/sagas"
+          onClick={() => setNavOpen(false)}
+        >
+          <LibraryIcon size={15} aria-hidden="true" /> Sagas
+        </a>
         <div className="mf-filters" role="group" aria-label="Filtres du catalogue">
           <Dropdown
             label="Genre"
@@ -759,6 +809,19 @@ export default function App() {
           <section className="mf-loading" aria-live="polite">
             <p>Chargement du catalogue…</p>
           </section>
+        ) : page.name === "sagas" ? (
+          <SagasPage
+            sagas={sagas}
+            failed={sagasFailed}
+            openId={page.id}
+            onOpenSaga={(id) => {
+              window.location.hash = id ? `/sagas/${id}` : "/sagas";
+              window.scrollTo({ top: 0 });
+            }}
+            onOpen={openTitle}
+            wantedIds={wantedIds}
+            onToggleWatch={(title) => toggleWatch(snapshotOf(title))}
+          />
         ) : route.name === "account" ? (
           <AccountPage
             profile={profile}
