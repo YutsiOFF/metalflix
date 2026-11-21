@@ -23,6 +23,7 @@ import {
   type PlatformKey,
   type Title,
 } from "./lib/catalog";
+import { STUDIO_LABEL, STUDIO_ORDER, loadStudios, titleKey, type StudioKey, type StudioSets } from "./lib/studios";
 import { currentProfileId, listProfiles, signOut, type Profile } from "./lib/accounts";
 import {
   clearHistory,
@@ -134,6 +135,20 @@ export default function App() {
   const [genre, setGenre] = useState<GenreKey | "all">("all");
   const [year, setYear] = useState<number | "all">("all");
   const [platform, setPlatform] = useState<PlatformKey | "all">("all");
+  // Marvel / DC: a studio tile filters like a service tile (lib/studios.ts).
+  const [studio, setStudio] = useState<StudioKey | "all">("all");
+  const [studioSets, setStudioSets] = useState<StudioSets | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadStudios()
+      .then((sets) => {
+        if (alive) setStudioSets(sets);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const scrollToResults = useRef(false);
   const [sort, setSort] = useState<Sort>("default");
   const [query, setQuery] = useState("");
@@ -227,16 +242,24 @@ export default function App() {
     ];
   }, [catalog]);
 
-  /** The platform tiles only show services that carry at least one title. */
+  /** The tiles only show services and studios that carry at least one title. */
   const studioCounts = useMemo(() => {
     const counts = new Map<PlatformKey, number>();
     for (const item of catalog) for (const key of item.platforms) counts.set(key, (counts.get(key) ?? 0) + 1);
-    return PLATFORM_ORDER.filter((key) => (counts.get(key) ?? 0) > 0).map((key) => ({
-      key,
+    const services = PLATFORM_ORDER.filter((key) => (counts.get(key) ?? 0) > 0).map((key) => ({
+      key: key as string,
       label: PLATFORM_LABEL[key],
       count: counts.get(key) ?? 0,
     }));
-  }, [catalog]);
+    const studios = STUDIO_ORDER.map((key) => ({
+      key: key as string,
+      label: STUDIO_LABEL[key],
+      count: studioSets ? catalog.filter((item) => studioSets[key].has(titleKey(item))).length : 0,
+    })).filter((tile) => tile.count > 0);
+    // Marvel and DC sit right after Disney+, like the reference row.
+    const at = Math.min(services.length, 3);
+    return [...services.slice(0, at), ...studios, ...services.slice(at)];
+  }, [catalog, studioSets]);
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
@@ -286,7 +309,7 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => setVisible(PAGE_SIZE), [filter, genre, platform, year, sort, query]);
+  useEffect(() => setVisible(PAGE_SIZE), [filter, genre, platform, studio, year, sort, query]);
 
   const wantedIds = useMemo(() => new Set(library.watchlist.map((item) => item.id)), [library.watchlist]);
 
@@ -307,9 +330,10 @@ export default function App() {
               : item.category === filter) &&
           (genre === "all" || item.genres.includes(genre)) &&
           (platform === "all" || item.platforms.includes(platform)) &&
+          (studio === "all" || Boolean(studioSets?.[studio].has(titleKey(item)))) &&
           (year === "all" || item.year === year),
       ),
-    [catalog, filter, genre, platform, year],
+    [catalog, filter, genre, platform, studio, studioSets, year],
   );
 
   const results = useMemo(() => {
@@ -325,6 +349,7 @@ export default function App() {
     filter !== "all" ||
     genre !== "all" ||
     platform !== "all" ||
+    studio !== "all" ||
     year !== "all" ||
     sort !== "default";
   const numeric = /^\d+$/.test(query.trim());
@@ -390,6 +415,7 @@ export default function App() {
     const pool = posterPool(results);
     const scope = [
       platform !== "all" ? PLATFORM_LABEL[platform] : null,
+      studio !== "all" ? STUDIO_LABEL[studio] : null,
       genre !== "all" ? GENRE_LABEL[genre] : null,
       year !== "all" ? String(year) : null,
     ]
@@ -406,7 +432,7 @@ export default function App() {
         large: true,
       });
 
-    const service = platform !== "all" ? PLATFORM_LABEL[platform] : "";
+    const service = platform !== "all" ? PLATFORM_LABEL[platform] : studio !== "all" ? STUDIO_LABEL[studio] : "";
     for (const category of ["film", "serie", "anime"] as Category[]) {
       const items = pool.filter((item) => item.category === category).slice(0, 40);
       if (!items.length) continue;
@@ -419,7 +445,7 @@ export default function App() {
       });
     }
     return rows;
-  }, [genre, platform, query, results, searchMode, year]);
+  }, [genre, platform, query, results, searchMode, studio, year]);
 
   // After a studio tile: once the filtered rows are on the page, glide down to
   // them, the header's height kept clear (scroll-margin on .mf-toolbar).
@@ -430,7 +456,7 @@ export default function App() {
       document.querySelector(".mf-toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     return () => cancelAnimationFrame(frame);
-  }, [platform]);
+  }, [platform, studio]);
 
   function openTitle(item: Title, at?: { season: number; episode: number; progress?: number }) {
     setResume(at ? { id: item.id, ...at } : null);
@@ -566,6 +592,7 @@ export default function App() {
     setFilter("all");
     setGenre("all");
     setPlatform("all");
+    setStudio("all");
     setYear("all");
     setSort("default");
     setQuery("");
@@ -753,11 +780,20 @@ export default function App() {
                 tapping the active tile is the way back to the whole catalogue. */}
             <StudioRail
               counts={studioCounts}
-              active={platform}
+              active={studio !== "all" ? studio : platform}
               onPick={(key) => {
-                const next = platform === key ? "all" : key;
-                setPlatform(next);
-                // Picking a service drops straight down to its titles.
+                const isStudio = (STUDIO_ORDER as string[]).includes(key);
+                const current = isStudio ? studio : platform;
+                const next = current === key ? "all" : key;
+                // One tile at a time: a studio clears the service and back.
+                if (isStudio) {
+                  setStudio(next as StudioKey | "all");
+                  setPlatform("all");
+                } else {
+                  setPlatform(next as PlatformKey | "all");
+                  setStudio("all");
+                }
+                // Picking a tile drops straight down to its titles.
                 if (next !== "all") scrollToResults.current = true;
               }}
             />

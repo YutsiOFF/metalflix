@@ -1804,3 +1804,57 @@ body {
   top: calc(0.75rem + env(safe-area-inset-top, 0px));
   right: calc(0.75rem + env(safe-area-inset-right, 0px));
 }
+
+/* --------------------------- studios Marvel / DC ---------------------- */
+
+.mf-studio--marvel {
+  background: #ec1d24;
+}
+
+.mf-studio--dc {
+  background: #0476f2;
+}
+
+.mf-studio__marvel {
+  padding: 0.04em 0.14em 0;
+  border: clamp(2px, 0.25vw, 3px) solid #fff;
+  color: #fff;
+  font-family: "Bebas Neue", Impact, "Arial Narrow", sans-serif;
+  font-size: clamp(1.9rem, 3.9vw, 4rem);
+  font-weight: 400;
+  white-space: nowrap;
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+}
+
+.mf-studio__dc {
+  display: grid;
+  place-items: center;
+  width: clamp(3.4rem, 6.4vw, 6.2rem);
+  aspect-ratio: 1;
+  border: clamp(3px, 0.4vw, 5px) solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  font-family: var(--mf-font);
+  font-size: clamp(1.3rem, 2.6vw, 2.5rem);
+  font-weight: 900;
+  letter-spacing: -0.07em;
+  text-indent: -0.07em;
+}
+
+/* Flèches pour faire coulisser la rangée des plateformes. */
+.mf-studios__frame {
+  position: relative;
+}
+
+.mf-studios__arrow {
+  top: calc(50% + 0.15rem);
+}
+
+/* --------------------------- filtres du header ------------------------ */
+
+/* Le menu affiche déjà « Genre », « Année »… : l'étiquette en petites
+   capitales au-dessus faisait doublon. */
+.mf-header .mf-select__label {
+  display: none;
+}
