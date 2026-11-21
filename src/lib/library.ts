@@ -14,8 +14,6 @@ export interface LibraryItem {
   type: "movie" | "series";
   category: Category;
   at: number;
-  /** Last change (position, "terminé"…), for syncing between devices. */
-  t?: number;
 }
 
 export interface HistoryEntry extends LibraryItem {
@@ -86,7 +84,7 @@ export function recordWatch(profileId: string, entry: Omit<HistoryEntry, "at">, 
   // Opening a title rewrites its entry without a position; the previous one
   // must survive, or a film loses its resume point the moment it is reopened.
   const history = [
-    { ...entry, progress: entry.progress ?? previous?.progress, done: entry.done ?? previous?.done ?? false, at, t: Date.now() },
+    { ...entry, progress: entry.progress ?? previous?.progress, done: entry.done ?? previous?.done ?? false, at },
     ...rest,
   ].slice(0, MAX_HISTORY);
   return write(profileId, { ...library, history });
@@ -97,7 +95,7 @@ export function markDone(profileId: string, id: number, done: boolean): Library 
   const library = readLibrary(profileId);
   return write(profileId, {
     ...library,
-    history: library.history.map((item) => (item.id === id ? { ...item, done, t: Date.now() } : item)),
+    history: library.history.map((item) => (item.id === id ? { ...item, done } : item)),
   });
 }
 
@@ -133,14 +131,8 @@ export function recordProgress(
     ...current,
     ...(season && episode ? { season, episode } : {}),
     progress: ratio,
-    t: Date.now(),
   };
   return write(profileId, { ...library, history });
-}
-
-/** Replace the stored library wholesale (used by the cloud sync). */
-export function saveLibrary(profileId: string, library: Library): Library {
-  return write(profileId, library);
 }
 
 export function clearHistory(profileId: string): Library {

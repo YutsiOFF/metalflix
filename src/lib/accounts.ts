@@ -14,8 +14,6 @@ export interface Profile {
   password: { salt: string; hash: string; iterations: number };
 }
 
-import { clearSession, cloudEnabled, cloudSignIn, cloudSignUp, type CloudSession } from "./cloud";
-
 const ACCOUNTS_KEY = "metalflix.accounts.v1";
 const SESSION_KEY = "metalflix.session.v1";
 const ITERATIONS = 150_000;
@@ -79,37 +77,10 @@ function newId(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-/**
- * Cloud mode: the account lives on the server; this device keeps a local
- * profile with the same id, so the rest of the site works unchanged. A profile
- * of the same name that only existed on this device hands its library over.
- */
-function adoptCloudProfile(session: CloudSession): Profile {
-  const accounts = readAccounts();
-  const lower = session.name.toLowerCase();
-  const localTwin = accounts.find((a) => a.id !== session.userId && a.name.toLowerCase() === lower);
-  const cloudKey = `metalflix.library.${session.userId}`;
-  if (localTwin && !localStorage.getItem(cloudKey)) {
-    const old = localStorage.getItem(`metalflix.library.${localTwin.id}`);
-    if (old) localStorage.setItem(cloudKey, old);
-  }
-  const profile: Profile = {
-    id: session.userId,
-    name: session.name,
-    createdAt: Date.now(),
-    password: { salt: "", hash: "", iterations: 0 },
-  };
-  const rest = accounts.filter((a) => a.id !== session.userId && a.id !== localTwin?.id);
-  writeAccounts([...rest, profile]);
-  localStorage.setItem(SESSION_KEY, profile.id);
-  return profile;
-}
-
 export async function signUp(name: string, password: string): Promise<Profile> {
   const clean = normalizeName(name);
   if (clean.length < 2) throw new Error("Choisissez un nom d'au moins 2 caractères.");
   if (password.length < 6) throw new Error("Le mot de passe doit faire 6 caractères minimum.");
-  if (cloudEnabled()) return adoptCloudProfile(await cloudSignUp(clean, password));
   const accounts = readAccounts();
   if (accounts.some((a) => a.name.toLowerCase() === clean.toLowerCase())) {
     throw new Error("Ce nom est déjà pris sur cet appareil.");
@@ -128,22 +99,18 @@ export async function signUp(name: string, password: string): Promise<Profile> {
 }
 
 export async function signIn(name: string, password: string): Promise<Profile> {
-  if (cloudEnabled()) {
-    // An account created before the sync existed only lived on its device: the
-    // first sign-in here creates it online with the same name and password.
-    try {
-      return adoptCloudProfile(await cloudSignIn(normalizeName(name), password));
-    } catch (error) {
-      const local = readAccounts().find((a) => a.name.toLowerCase() === normalizeName(name).toLowerCase());
-      if (!local?.password.hash) throw error;
-      const hash = await stretch(password, fromBase64(local.password.salt), local.password.iterations ?? ITERATIONS);
-      if (hash !== local.password.hash) throw error;
-      return adoptCloudProfile(await cloudSignUp(normalizeName(name), password));
-    }
-  }
   const clean = normalizeName(name).toLowerCase();
   const profile = readAccounts().find((a) => a.name.toLowerCase() === clean);
   if (!profile) throw new Error("Aucun compte de ce nom sur cet appareil.");
+  // A profile left by the short-lived online accounts has no local password:
+  // the first sign-in here sets it, so nobody is locked out of their history.
+  if (!profile.password.hash) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    profile.password = { salt: toBase64(salt), hash: await stretch(password, salt, ITERATIONS), iterations: ITERATIONS };
+    writeAccounts(readAccounts().map((a) => (a.id === profile.id ? profile : a)));
+    localStorage.setItem(SESSION_KEY, profile.id);
+    return profile;
+  }
   const hash = await stretch(password, fromBase64(profile.password.salt), profile.password.iterations ?? ITERATIONS);
   if (hash !== profile.password.hash) throw new Error("Mot de passe incorrect.");
   localStorage.setItem(SESSION_KEY, profile.id);
@@ -152,7 +119,6 @@ export async function signIn(name: string, password: string): Promise<Profile> {
 
 export function signOut() {
   localStorage.removeItem(SESSION_KEY);
-  clearSession();
 }
 
 export function deleteProfile(id: string) {

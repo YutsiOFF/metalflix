@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { LogIn, ShieldCheck, UserPlus, X } from "lucide-react";
 import { listProfiles, signIn, signUp, type Profile } from "../lib/accounts";
-import { cloudEnabled } from "../lib/cloud";
 
 interface AccountModalProps {
   onClose: () => void;
@@ -45,11 +44,7 @@ export default function AccountModal({ onClose, onAuthenticated }: AccountModalP
         <header className="mf-auth__head">
           <div>
             <h2>{mode === "signup" ? "Créer un compte" : "Se connecter"}</h2>
-            <p>
-              {cloudEnabled()
-                ? "Gratuit : un nom, un mot de passe, et ton historique te suit sur téléphone, PC et télé."
-                : "Gratuit, sans serveur : votre profil et votre historique restent sur cet appareil."}
-            </p>
+            <p>Gratuit, sans serveur : votre profil et votre historique restent sur cet appareil.</p>
           </div>
           <button type="button" className="mf-btn mf-btn--sm" onClick={onClose}>
             <X size={15} /> Fermer
@@ -136,10 +131,8 @@ export default function AccountModal({ onClose, onAuthenticated }: AccountModalP
         ) : null}
 
         <p className="mf-auth__note">
-          <ShieldCheck size={14} />{" "}
-          {cloudEnabled()
-            ? "Même nom et même mot de passe sur chaque appareil : l'historique, les reprises et « Ma liste » se synchronisent tout seuls. Aucun e-mail demandé."
-            : "Mot de passe salé et étiré (PBKDF2-SHA256, 150 000 tours) dans le stockage local du navigateur. Aucune donnée n'est envoyée sur un serveur."}
+          <ShieldCheck size={14} /> Mot de passe salé et étiré (PBKDF2-SHA256, 150 000 tours) dans le stockage local du
+          navigateur. Aucune donnée n'est envoyée sur un serveur.
         </p>
       </div>
     </div>
