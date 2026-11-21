@@ -22,7 +22,7 @@ echo.
 echo -- Envoi des sources sur la branche main...
 git add -A
 git diff --cached --quiet && (echo    Aucune modification a commiter.) || (
-  git commit -m "Nouveau style : theme clean (Poppins, cartes epurees, top 10)" || (echo [ERREUR] Commit impossible. & pause & exit /b 1)
+  git commit -m "Nouveau style : style Senpai-Stream (Montserrat, fondus, top 10)" || (echo [ERREUR] Commit impossible. & pause & exit /b 1)
 )
 git push origin main || (echo [ERREUR] git push a echoue. Verifie ta connexion GitHub. & pause & exit /b 1)
 

@@ -1,224 +1,353 @@
 /* =====================================================================
-   MetalFlix — thème « clean »
+   MetalFlix — thème « clean » (calqué sur Senpai-Stream)
    Couche visuelle chargée APRÈS styles.css : elle ne fait que repeindre
-   (typo, couleurs, rayons, cartes). Aucune classe ni logique n'est
-   modifiée. Pour revenir à l'ancien look, retirer l'import dans main.tsx.
+   (typo, couleurs, rayons, fondus). Aucune classe ni logique modifiée.
+   Pour revenir à l'ancien look : retirer l'import dans main.tsx.
    ===================================================================== */
 
 @font-face {
-  font-family: "Poppins";
+  font-family: "Montserrat";
   font-style: normal;
-  font-weight: 500;
+  font-weight: 100 900;
   font-display: swap;
-  src: url("./assets/fonts/poppins-latin-500-normal.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Poppins";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("./assets/fonts/poppins-latin-600-normal.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Poppins";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("./assets/fonts/poppins-latin-700-normal.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Poppins";
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url("./assets/fonts/poppins-latin-800-normal.woff2") format("woff2");
+  src: url("./assets/fonts/montserrat-latin-wght-normal.woff2") format("woff2");
 }
 
 :root {
   --mf-bg: #09090b;
+  --mf-bg-rgb: 9, 9, 11;
   --mf-bg-raised: #111114;
-  --mf-surface: #141418;
-  --mf-surface-2: #1b1b20;
-  --mf-surface-3: #25252c;
+  --mf-surface: #18181b;
+  --mf-surface-2: #1f1f23;
+  --mf-surface-3: #27272a;
   --mf-line: rgba(255, 255, 255, 0.07);
   --mf-line-strong: rgba(255, 255, 255, 0.14);
-  --mf-text-2: #b9b9c3;
-  --mf-text-3: #7c7c88;
+  --mf-text: #ffffff;
+  --mf-text-2: #d4d4d8;
+  --mf-text-3: #a1a1aa;
 
   --mf-radius-s: 6px;
-  --mf-radius: 10px;
+  --mf-radius: 12px;
   --mf-radius-l: 12px;
 
-  --mf-display: "Poppins", "Inter", system-ui, sans-serif;
+  --mf-gutter: clamp(1.25rem, 4.2vw, 5rem);
+  --mf-font: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --mf-card-w: 168px;
-  --mf-card-w-lg: 196px;
+  /* Affiches larges, comme la référence : ~5,5 cartes par écran. */
+  --mf-card-w: clamp(8.5rem, 16.4vw, 21rem);
+  --mf-card-w-lg: clamp(8.5rem, 16.4vw, 21rem);
 }
 
 @media (min-width: 1700px) {
   :root {
-    --mf-card-w: 184px;
-    --mf-card-w-lg: 214px;
+    --mf-card-w: clamp(8.5rem, 16.4vw, 21rem);
+    --mf-card-w-lg: clamp(8.5rem, 16.4vw, 21rem);
   }
 }
 
 @media (max-width: 820px) {
   :root {
-    --mf-card-w: 122px;
-    --mf-card-w-lg: 140px;
+    --mf-card-w: 9.2rem;
+    --mf-card-w-lg: 9.2rem;
   }
 }
 
-/* Fond uni : plus de halo rouge en haut de page. */
+html,
+body {
+  background: var(--mf-bg);
+  font-family: var(--mf-font);
+}
+
+/* Fond uni : aucun halo, aucune couleur qui ne rejoint pas les fondus. */
 .mf-shell {
   background: var(--mf-bg);
 }
 
 /* ------------------------------- header ------------------------------ */
 
+/* Pas de flou : une bande floutée au-dessus de l'image est exactement ce qui
+   faisait une coupure. Juste un fondu vers le transparent. */
 .mf-header {
-  background: linear-gradient(180deg, rgba(9, 9, 11, 0.92) 0%, rgba(9, 9, 11, 0.6) 65%, transparent 100%);
+  background: linear-gradient(
+    180deg,
+    rgb(var(--mf-bg-rgb)) 0%,
+    rgba(var(--mf-bg-rgb), 0.96) 62%,
+    rgba(var(--mf-bg-rgb), 0) 100%
+  );
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .mf-logo span {
-  font-family: var(--mf-display);
-  font-size: 1.55rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-family: var(--mf-font);
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
   text-shadow: none;
 }
 
 .mf-logo strong {
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .mf-header__search {
-  border-radius: 999px;
+  height: 2.4rem;
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .mf-header__search:focus-within {
   border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(15, 15, 18, 0.95);
+  background: rgba(var(--mf-bg-rgb), 0.95);
 }
 
-.mf-account-btn,
-.mf-nav__toggle {
-  border-color: transparent;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+.mf-header__search input {
+  font-size: 0.85rem;
 }
 
-.mf-account-btn__avatar {
-  border-radius: 50%;
-}
-
-/* Les filtres du header : des pastilles sans contour. */
+/* Filtres : du texte, pas des boîtes — comme les liens de la nav de référence. */
 .mf-header .mf-select {
   border-color: transparent;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  background: transparent;
 }
 
 .mf-header .mf-select:hover,
 .mf-header .mf-select[data-open="true"] {
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mf-header .mf-select__value {
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .mf-header .mf-btn {
   border-color: transparent;
+  background: transparent;
+  color: var(--mf-text-2);
+  font-weight: 500;
+}
+
+.mf-header .mf-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+/* Le bouton compte devient le bouton rouge « S'inscrire » de la référence. */
+.mf-account-btn {
+  height: 2.35rem;
+  padding: 0 1.1rem 0 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mf-accent);
+  color: #fff;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: background-color 0.15s, transform 0.15s;
+}
+
+.mf-account-btn:hover {
+  background: #c40812;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* « Installer » reste discret, comme « Se connecter » à côté du bouton rouge. */
+.mf-account-btn.mf-install__btn {
+  padding: 0 0.9rem;
+  background: transparent;
+  color: var(--mf-text-2);
+}
+
+.mf-account-btn.mf-install__btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  transform: none;
+}
+
+.mf-account-btn__avatar {
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.mf-nav__toggle {
+  border-color: transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* ------------------------------ buttons ------------------------------ */
 
 .mf-btn {
-  border-radius: 999px;
-  font-family: var(--mf-display);
-  font-weight: 600;
-  letter-spacing: 0;
+  border-radius: 8px;
+  font-family: var(--mf-font);
+  font-weight: 500;
 }
 
 .mf-btn--primary {
+  border: 0;
   background: var(--mf-accent);
   color: #fff;
-  box-shadow: 0 8px 24px rgba(229, 9, 20, 0.28);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .mf-btn--primary:hover {
-  background: var(--mf-accent-hover);
+  background: #c40812;
 }
 
 .mf-more {
   color: var(--mf-text-2);
-  font-size: 0.74rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .mf-more:hover {
-  color: var(--mf-accent);
+  color: #fff;
 }
 
 /* -------------------------------- hero ------------------------------- */
 
-.mf-hero__veil {
-  background:
-    linear-gradient(90deg, rgba(9, 9, 11, 0.95) 0%, rgba(9, 9, 11, 0.7) 36%, rgba(9, 9, 11, 0.05) 72%),
-    linear-gradient(180deg, rgba(9, 9, 11, 0.55) 0%, transparent 28%, rgba(9, 9, 11, 0.4) 72%, var(--mf-bg) 100%);
+/* Le visuel passe sous le header, du haut de la page jusqu'aux studios. */
+.mf-hero {
+  min-height: clamp(30rem, 86vh, 58rem);
+  margin-bottom: 0;
+  background: var(--mf-bg);
 }
 
+@media (min-width: 1101px) {
+  main > .mf-hero:first-child {
+    margin-top: calc(-1 * (var(--mf-nav-h) + env(safe-area-inset-top, 0px)));
+  }
+}
+
+.mf-hero__still {
+  object-position: center 20%;
+}
+
+/* L'image elle-même s'efface vers le bas (masque), puis le voile finit le
+   travail : même au pixel près, aucune ligne claire sous la vedette. */
+.mf-hero__stills {
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 97%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 97%);
+}
+
+/* Les trois fondus de la référence, dans un seul calque :
+   haut (sous le header), gauche (sous le texte), bas (vers la page).
+   Le bas finit sur la couleur exacte du fond : aucune ligne de coupe. */
+.mf-hero__veil {
+  bottom: -2px;
+  background:
+    linear-gradient(180deg, rgb(var(--mf-bg-rgb)) 0%, rgba(var(--mf-bg-rgb), 0.4) 3.5rem, rgba(var(--mf-bg-rgb), 0) 8rem),
+    linear-gradient(
+      0deg,
+      rgb(var(--mf-bg-rgb)) 0%,
+      rgba(var(--mf-bg-rgb), 0.7) 22%,
+      rgba(var(--mf-bg-rgb), 0) 50%
+    ),
+    linear-gradient(90deg, rgb(var(--mf-bg-rgb)) 0%, rgba(var(--mf-bg-rgb), 0.55) 30%, rgba(var(--mf-bg-rgb), 0) 66%);
+}
+
+.mf-hero__inner {
+  width: min(44rem, 92%);
+  padding-bottom: clamp(5rem, 12vh, 8.5rem);
+}
+
+/* Pas d'étiquette « à la une » : le titre parle de lui-même. */
 .mf-eyebrow {
-  color: var(--mf-accent);
-  font-family: var(--mf-display);
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  display: none;
 }
 
 .mf-hero__title {
-  font-family: var(--mf-display);
-  font-weight: 700;
-  font-size: clamp(2.2rem, 4.6vw, 4.1rem);
-  line-height: 1.04;
-  letter-spacing: -0.025em;
-  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.45);
+  margin-bottom: 1rem;
+  font-family: var(--mf-font);
+  font-weight: 900;
+  font-size: clamp(2.3rem, 5vw, 4.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .mf-hero__meta {
-  font-size: 0.82rem;
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
+  color: var(--mf-text-2);
+  font-size: 0.95rem;
   font-weight: 500;
 }
 
+/* La pastille grise « FHD » de la référence. */
 .mf-hero__meta .mf-chip {
+  padding: 0.28rem 0.5rem;
   border: 0;
-  background: var(--mf-accent);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
   color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.mf-hero__genres {
+  color: var(--mf-text-2);
 }
 
 .mf-hero__synopsis {
-  font-size: 0.92rem;
-  line-height: 1.6;
+  max-width: 34rem;
+  margin-bottom: 1.6rem;
+  color: var(--mf-text-2);
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.55;
+  -webkit-line-clamp: 2;
 }
 
 .mf-hero__actions .mf-btn {
-  height: 2.75rem;
-  padding: 0 1.5rem;
-  font-size: 0.9rem;
+  height: auto;
+  padding: 0.95rem 2rem;
+  font-size: 0.95rem;
+}
+
+/* « Lecture » : pas d'icône, juste le libellé sur le rouge. */
+.mf-hero__actions .mf-btn--primary svg {
+  display: none;
+}
+
+/* Pagination centrée en bas : des points, l'actif en pilule rouge. */
+.mf-hero__nav {
+  left: 50%;
+  right: auto;
+  bottom: clamp(2.5rem, 6vh, 4.5rem);
+  transform: translateX(-50%);
 }
 
 .mf-hero__arrow {
-  border-color: transparent;
-  background: rgba(255, 255, 255, 0.1);
+  display: none;
+}
+
+.mf-hero__dots {
+  gap: 0.5rem;
 }
 
 .mf-hero__dots button {
-  width: 1.1rem;
-  height: 4px;
-  border-radius: 4px;
-  transition: width 0.3s var(--mf-ease);
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+  transition: width 0.3s var(--mf-ease), background-color 0.2s;
 }
 
 .mf-hero__dots button.is-active {
   width: 2rem;
+  background: rgba(255, 255, 255, 0.25);
 }
 
 /* --------------------------- section titles -------------------------- */
@@ -227,138 +356,180 @@
 .mf-row__head h2,
 .mf-top__head h2,
 .mf-studios__head h2 {
-  font-family: var(--mf-display);
-  font-size: 0.86rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-family: var(--mf-font);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
   text-transform: uppercase;
+  color: #fff;
 }
 
-/* Les icônes devant chaque titre alourdissaient la page. */
-.mf-row__head h2 svg {
+.mf-row__head h2 svg,
+.mf-section__head h2 svg {
   display: none;
 }
 
 .mf-row__head h2 small {
-  font-family: "Inter", system-ui, sans-serif;
+  color: var(--mf-text-3);
+  font-size: 0.75rem;
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--mf-text-3);
+}
+
+.mf-row__head,
+.mf-section__head,
+.mf-studios__head {
+  align-items: center;
+  margin-bottom: 0.35rem;
 }
 
 .mf-row {
-  padding-bottom: 1.1rem;
+  padding-bottom: 2.25rem;
 }
 
 .mf-rail {
   gap: 0.75rem;
-  padding-top: 0.75rem;
+  padding-top: 0.9rem;
 }
 
+/* Flèches : des pilules grises translucides qui n'apparaissent qu'au survol. */
 .mf-row__arrow {
-  width: 2.5rem;
-  height: 2.5rem;
-  margin-top: -2.4rem;
-  border-radius: 50%;
-  background: rgba(20, 20, 24, 0.88);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  width: 2.4rem;
+  height: 3.75rem;
+  margin-top: -3.4rem;
+  border-radius: 999px;
+  background: rgba(82, 82, 91, 0.7);
+  box-shadow: none;
+  opacity: 0;
+  transition: opacity 0.2s, background-color 0.2s, transform 0.2s;
+}
+
+.mf-row__arrow--prev {
+  left: 0.6rem;
+}
+
+.mf-row__arrow--next {
+  right: 0.6rem;
+}
+
+.mf-row__frame:hover .mf-row__arrow,
+.mf-row__arrow:focus-visible {
+  opacity: 1;
 }
 
 .mf-row__arrow:hover {
-  background: #fff;
-  color: #000;
+  background: var(--mf-accent);
+  transform: scale(1.05);
+}
+
+@media (hover: none) {
+  .mf-row__arrow {
+    opacity: 1;
+  }
 }
 
 /* ------------------------------ toolbar ------------------------------ */
 
+.mf-toolbar {
+  padding-top: 0.5rem;
+  padding-bottom: 1.25rem;
+}
+
 .mf-seg__btn {
-  font-family: var(--mf-display);
-  font-size: 0.88rem;
+  font-family: var(--mf-font);
+  font-size: 0.9rem;
   font-weight: 500;
+  color: var(--mf-text-2);
 }
 
 .mf-seg__btn.is-active {
-  font-weight: 700;
+  color: var(--mf-accent);
+  font-weight: 600;
+}
+
+.mf-count {
+  font-size: 0.8rem;
 }
 
 /* ------------------------------- cards ------------------------------- */
 
-/* La carte n'est plus un panneau : juste l'affiche, et le texte dessous. */
+/* Juste l'affiche aux coins arrondis, puis le titre et la ligne rouge. */
 .mf-card__inner {
   background: transparent;
   overflow: visible;
+  box-shadow: none;
 }
 
 .mf-card__poster {
   border-radius: var(--mf-radius);
-  background: var(--mf-surface-2);
+  background: var(--mf-surface);
   box-shadow: none;
+  transition: transform 0.5s var(--mf-ease-out);
 }
 
 .mf-card__poster::after {
-  background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.6) 100%);
-}
-
-.mf-card__body {
-  min-height: 0;
-  padding: 0.55rem 0.1rem 0;
-}
-
-.mf-card__title {
-  height: auto;
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1.3;
-  -webkit-line-clamp: 1;
-}
-
-/* « Film • 2026 », en rouge, comme la référence. */
-.mf-card__meta {
-  margin-top: 0.2rem;
-  color: var(--mf-accent);
-  font-size: 0.68rem;
-  font-weight: 600;
-}
-
-.mf-card--silver .mf-card__meta::before {
-  content: "Film  •  ";
-  white-space: pre;
-}
-
-.mf-card--cobalt .mf-card__meta::before {
-  content: "Série  •  ";
-  white-space: pre;
-}
-
-.mf-card--amethyst .mf-card__meta::before {
-  content: "Anime  •  ";
-  white-space: pre;
-}
-
-/* Le type est déjà dans la ligne rouge : le badge sur l'affiche est en trop. */
-.mf-card__badge {
   display: none;
 }
 
 .mf-card__play {
-  background: rgba(0, 0, 0, 0.25);
+  display: none;
 }
 
-.mf-card__play svg {
-  border: 0;
-  background: var(--mf-accent);
-  box-shadow: 0 8px 24px rgba(229, 9, 20, 0.45);
+.mf-card__body {
+  min-height: 0;
+  padding: 1rem 0.1rem 0;
+}
+
+.mf-card__title {
+  height: auto;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+  -webkit-line-clamp: 1;
+}
+
+.mf-card__meta {
+  margin-top: 0.25rem;
+  color: var(--mf-accent);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.mf-card--silver .mf-card__meta::before,
+.mf-card--cobalt .mf-card__meta::before,
+.mf-card--amethyst .mf-card__meta::before {
+  white-space: pre;
+}
+
+.mf-card--silver .mf-card__meta::before {
+  content: "Film   •   ";
+}
+
+.mf-card--cobalt .mf-card__meta::before {
+  content: "Série   •   ";
+}
+
+.mf-card--amethyst .mf-card__meta::before {
+  content: "Anime   •   ";
+}
+
+.mf-card__badge {
+  display: none;
 }
 
 .mf-card__watch {
+  top: 0.55rem;
+  right: 0.55rem;
   border-color: transparent;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .mf-card:hover,
   .mf-card:focus-within {
-    transform: translateY(-4px);
+    transform: none;
   }
 
   .mf-card:hover .mf-card__inner,
@@ -369,77 +540,263 @@
 
   .mf-card:hover .mf-card__poster,
   .mf-card:focus-within .mf-card__poster {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 18px 36px rgba(0, 0, 0, 0.6);
+    transform: scale(1.02);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8);
   }
 
-  .mf-card:hover .mf-card__title {
-    color: #fff;
+  .mf-card:hover .mf-card__poster img {
+    transform: none;
   }
 }
 
-/* ------------------------------ top 10 ------------------------------- */
+@media (max-width: 820px) {
+  .mf-card__body {
+    padding-top: 0.6rem;
+  }
 
-.mf-top__head h2 {
-  font-size: 0.86rem;
-}
+  .mf-card__title {
+    font-size: 0.85rem;
+  }
 
-.mf-top__rank {
-  font-family: var(--mf-display);
-  font-weight: 800;
-  line-height: 0.85;
-  letter-spacing: -0.04em;
-  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.55);
-  margin-right: 0.1rem;
-}
-
-.mf-top__card {
-  border: 0;
-  border-radius: var(--mf-radius);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-}
-
-.mf-top__card:hover,
-.mf-top__card:focus-visible {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 18px 40px rgba(0, 0, 0, 0.6);
-}
-
-.mf-top__title {
-  font-family: var(--mf-display);
-  font-weight: 800;
-  font-size: clamp(0.95rem, 1.4vw, 1.2rem);
-  letter-spacing: -0.01em;
-  line-height: 1.1;
-  text-align: left;
-  padding: 0.6rem 0.85rem 0.7rem;
-}
-
-.mf-top__meta {
-  font-size: 0.74rem;
+  .mf-card__meta {
+    font-size: 0.7rem;
+  }
 }
 
 /* --------------------------- studios tiles --------------------------- */
 
+.mf-studios {
+  padding: 1rem 0 0.5rem;
+}
+
+.mf-studios__track {
+  gap: 1.25rem;
+  padding-top: 0.9rem;
+  scroll-padding-left: var(--mf-gutter);
+}
+
+.mf-studios__hint {
+  color: var(--mf-text-2);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Aplats de couleur, gros logo, pas de reflet ni de compteur. */
 .mf-studio {
-  border-radius: var(--mf-radius);
+  width: clamp(11rem, 18.4vw, 22rem);
+  aspect-ratio: 2 / 1;
+  border: 0;
+  border-radius: 8px;
+  gap: 0;
+}
+
+.mf-studio::before,
+.mf-studio::after {
+  display: none;
+}
+
+.mf-studio__meta {
+  display: none;
+}
+
+.mf-studio__logo {
+  height: clamp(2.4rem, 4.6vw, 4.6rem);
+  max-width: 78%;
+}
+
+.mf-studio__word {
+  font-family: var(--mf-font);
+  font-weight: 800;
+  font-size: clamp(1.4rem, 2.8vw, 2.6rem);
+  letter-spacing: -0.01em;
 }
 
 .mf-studio:hover,
 .mf-studio:focus-visible {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8);
+}
+
+.mf-studio.is-active {
+  box-shadow: 0 0 0 3px #fff;
+}
+
+.mf-studio--netflix {
+  background: #ffffff;
+}
+
+.mf-studio--prime {
+  background: #1b2530;
+}
+
+.mf-studio--disney {
+  background: #0f1932;
+}
+
+.mf-studio--paramount {
+  background: #0064ff;
+}
+
+.mf-studio--canal {
+  background: #000000;
+}
+
+.mf-studio--appletv {
+  background: #1c1c1e;
+}
+
+/* ------------------------------ top 10 ------------------------------- */
+
+/* Le visuel du n°1 couvre la section ; un voile noir le calme, et deux
+   fondus le font naître et mourir dans la couleur exacte de la page. */
+.mf-top {
+  margin: 1rem 0 0;
+  padding: clamp(4rem, 8vw, 6rem) 0 clamp(3rem, 6vw, 4.5rem);
+  background: var(--mf-bg);
+}
+
+.mf-top__wash {
+  inset: 0;
+  background-position: center 25%;
+  transform: scale(1.1);
+  filter: none;
+}
+
+.mf-top::after {
+  background:
+    linear-gradient(180deg, rgb(var(--mf-bg-rgb)) 0%, rgba(var(--mf-bg-rgb), 0) 6rem),
+    linear-gradient(
+      0deg,
+      rgb(var(--mf-bg-rgb)) 0%,
+      rgba(var(--mf-bg-rgb), 0.8) 8rem,
+      rgba(var(--mf-bg-rgb), 0) 16rem
+    ),
+    linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5));
+}
+
+.mf-top__head {
+  margin-bottom: 1.25rem;
+}
+
+.mf-top__head span {
+  display: none;
+}
+
+.mf-top__track {
+  align-items: flex-start;
+  padding-left: var(--mf-gutter);
+  /* Sans ça, l'aimantation du défilement cachait le « 1 » sous le bord. */
+  scroll-padding-left: var(--mf-gutter);
+}
+
+.mf-top__item {
+  align-items: center;
+}
+
+/* Le chiffre géant noir cerclé de blanc, glissé sous la carte. */
+.mf-top__rank {
+  min-width: 0;
+  margin-right: -0.24em;
+  padding-bottom: 2.4rem;
+  color: #000;
+  font-family: var(--mf-font);
+  font-size: clamp(6rem, 14vw, 16rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: left;
+  -webkit-text-stroke: 2px #fff;
+  filter: none;
+}
+
+.mf-top__body {
+  gap: 1rem;
+  margin-right: 2rem;
+}
+
+.mf-top__card {
+  width: clamp(15rem, 27.5vw, 33rem);
+  border: 0;
+  border-radius: var(--mf-radius);
+  background: var(--mf-bg);
+  box-shadow: none;
+}
+
+.mf-top__card:hover,
+.mf-top__card:focus-visible {
+  transform: none;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8);
+}
+
+.mf-top__card:hover img,
+.mf-top__card:focus-visible img {
+  transform: scale(1.02);
+}
+
+.mf-top__veil {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.3) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* Le titre original prend la place du logo du film : centré, en bas. */
+.mf-top__title {
+  left: 50%;
+  right: auto;
+  bottom: 0.9rem;
+  width: 80%;
+  padding: 0;
+  transform: translateX(-50%);
+  font-family: var(--mf-font);
+  font-weight: 900;
+  font-size: clamp(0.95rem, 1.55vw, 1.5rem);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.mf-top__meta {
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.mf-top__meta small {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mf-studios__hint {
+    display: none;
+  }
+
+  .mf-top__rank {
+    padding-bottom: 2rem;
+    font-size: 5.5rem;
+    -webkit-text-stroke-width: 1px;
+  }
+
+  .mf-top__card {
+    width: 15rem;
+  }
+
+  .mf-top__meta {
+    font-size: 0.85rem;
+  }
+
+  .mf-section__head h2,
+  .mf-row__head h2,
+  .mf-top__head h2,
+  .mf-studios__head h2 {
+    font-size: 1.05rem;
+  }
+
+  .mf-hero__title {
+    font-size: clamp(2rem, 9vw, 2.8rem);
+  }
 }
 
 /* ------------------------------- resume ------------------------------ */
 
 .mf-resume__card {
   border-radius: var(--mf-radius);
-}
-
-@media (max-width: 640px) {
-  .mf-top__rank {
-    margin-right: -0.4rem;
-  }
-
-  .mf-hero__title {
-    font-size: clamp(1.9rem, 8.4vw, 2.6rem);
-  }
 }
