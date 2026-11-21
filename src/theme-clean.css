@@ -1247,14 +1247,19 @@ body {
 }
 
 @media (max-width: 640px) {
+  /* Le cadre vidéo est trop bas en portrait : le choix prend tout l'écran. */
   .mf-castmenu {
-    gap: 0.45rem;
-    padding: 0.75rem 1rem;
+    position: fixed;
+    z-index: 200;
+    gap: 0.7rem;
+    padding: 1.25rem;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
+    background: rgba(0, 0, 0, 0.96);
   }
 
-  .mf-castmenu h3 {
-    display: none;
+  .mf-castmenu__close {
+    top: calc(0.75rem + env(safe-area-inset-top, 0px));
   }
 
   .mf-castmenu__opt {
@@ -1264,4 +1269,27 @@ body {
   .mf-castmenu__opt small {
     font-size: 0.68rem;
   }
+}
+
+.mf-castmenu__missing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.9rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(229, 9, 20, 0.14);
+}
+
+.mf-castmenu__missing p {
+  flex: 1 1 14rem;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.mf-castmenu__missing .mf-btn {
+  height: 2.3rem;
+  padding: 0 1rem;
+  text-decoration: none;
 }

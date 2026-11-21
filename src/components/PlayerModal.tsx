@@ -169,6 +169,8 @@ export default function PlayerModal({
   /** iPhone/iPad: the cast button opens a small choice (AirPlay or Chromecast). */
   const [castMenu, setCastMenu] = useState(false);
   const [castCopied, setCastCopied] = useState(false);
+  /** Set when the VLC link went nowhere: VLC is not installed on this iPhone. */
+  const [vlcMissing, setVlcMissing] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -821,6 +823,7 @@ export default function PlayerModal({
     // button offers both routes — AirPlay here, Chromecast through VLC.
     if (ios) {
       setCastCopied(false);
+      setVlcMissing(false);
       setCastMenu(true);
       return;
     }
@@ -858,6 +861,30 @@ export default function PlayerModal({
         typeof window !== "undefined" ? window.location.href : "",
       )}`
     : "";
+
+  /**
+   * Safari cannot tell whether an app is installed: it just tries the link.
+   * If VLC opens, the page goes to the background within a moment; if the
+   * page is still on screen after that, VLC is missing and we say so (Safari
+   * has then shown its own "adresse non valide" notice).
+   */
+  const openInVlc = () => {
+    videoRef.current?.pause();
+    let left = false;
+    const onHide = () => {
+      if (document.hidden) left = true;
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.setTimeout(() => {
+      document.removeEventListener("visibilitychange", onHide);
+      if (left) {
+        setCastMenu(false);
+        return;
+      }
+      setVlcMissing(true);
+    }, 1800);
+    window.location.href = vlcLink;
+  };
 
   const copyStream = async () => {
     try {
@@ -1377,20 +1404,29 @@ export default function PlayerModal({
                 <small>Apple TV, télé Samsung / LG / Sony compatibles</small>
               </span>
             </button>
-            <a
-              className="mf-castmenu__opt"
-              href={vlcLink}
-              onClick={() => {
-                videoRef.current?.pause();
-                setCastMenu(false);
-              }}
-            >
+            <button type="button" className="mf-castmenu__opt" onClick={openInVlc}>
               <Cast size={22} />
               <span>
                 <strong>Chromecast</strong>
-                <small>S'ouvre dans VLC : touche l'icône cast en haut, choisis ta Chromecast</small>
+                <small>S'ouvre dans l'app VLC : touche l'icône cast en haut, choisis ta Chromecast</small>
               </span>
-            </a>
+            </button>
+            {vlcMissing ? (
+              <div className="mf-castmenu__missing" role="alert">
+                <p>
+                  VLC n'est pas installé sur cet iPhone. Apple bloque le Chromecast dans Safari : c'est l'app VLC
+                  (gratuite) qui fait le lien avec la télé.
+                </p>
+                <a
+                  className="mf-btn mf-btn--primary"
+                  href="https://apps.apple.com/app/vlc-media-player/id650377962"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Installer VLC
+                </a>
+              </div>
+            ) : null}
             <p className="mf-castmenu__note">
               Pas encore VLC ?{" "}
               <a href="https://apps.apple.com/app/vlc-media-player/id650377962" target="_blank" rel="noreferrer">
