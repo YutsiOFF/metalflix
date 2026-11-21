@@ -32,7 +32,7 @@ export interface TitleDetails {
 
 const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
 const WIKI_API = "https://fr.wikipedia.org/w/api.php";
-const CACHE_KEY = "metalflix.details.v4";
+const CACHE_KEY = "metalflix.details.v5";
 /** The sheet has room for a real paragraph, unlike the hero one-liner. */
 const PLOT_CHARS = 1100;
 const MAX_CREDITS = 14;
@@ -234,7 +234,11 @@ function stripOpening(text: string): string {
 
 /** The opening of the plot, cut on a sentence so it never stops mid-thought. */
 function shorten(text: string): string {
-  const clean = text.replace(/\s+/g, " ").trim();
+  // Wikipedia's footnote marks ("[1]", "[2]", "[réf. nécessaire]") are noise here.
+  const clean = text
+    .replace(/\s*\[(?:\d+|[a-z]|réf[^\]]*|note[^\]]*)\](?:\s*,?\s*\[(?:\d+|[a-z]|réf[^\]]*|note[^\]]*)\])*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (clean.length <= PLOT_CHARS) return clean;
   const cut = clean.slice(0, PLOT_CHARS);
   const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
