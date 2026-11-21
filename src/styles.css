@@ -706,9 +706,10 @@ h3 {
   animation: mf-fill var(--mf-rotate, 9000ms) linear forwards;
 }
 
+/* Paused, the bar holds where it is and picks up from there: the slide's own
+   timer in Hero.tsx resumes with the same remaining time. */
 .mf-hero__nav.is-paused .mf-hero__dots button.is-active .mf-hero__fill {
-  animation: none;
-  transform: scaleX(1);
+  animation-play-state: paused;
 }
 
 @keyframes mf-fill {

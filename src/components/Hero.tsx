@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from "react";
 import { ChevronLeft, ChevronRight, Play, Sparkles } from "lucide-react";
 import type { Title } from "../lib/catalog";
 import { GENRE_LABEL } from "../lib/catalog";
@@ -35,17 +35,58 @@ export default function Hero({ items, onPlay }: HeroProps) {
     if (index >= count) setIndex(0);
   }, [count, index]);
 
+  // A hidden tab stops the clock too, so the bar and the slide stay together.
+  const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.hidden);
   useEffect(() => {
-    if (paused || count < 2) return;
-    const timer = window.setInterval(() => setIndex((value) => (value + 1) % count), ROTATE_MS);
-    return () => window.clearInterval(timer);
-  }, [paused, count]);
+    const onVisibility = () => setHidden(document.hidden);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
+  /**
+   * One timeout per slide, restarted whenever the slide changes and resumed
+   * (not restarted) after a pause. The old setInterval ignored dot clicks and
+   * restarted on every hover, so the red bar could finish while the slide
+   * stayed put. The bar's CSS animation pauses on the same flag.
+   */
+  const elapsed = useRef(0);
+  const shownIndex = useRef(index);
+  const stopped = paused || hidden;
+  useEffect(() => {
+    if (shownIndex.current !== index) {
+      shownIndex.current = index;
+      elapsed.current = 0;
+    }
+    if (stopped || count < 2) return;
+    const started = Date.now();
+    const timer = window.setTimeout(
+      () => setIndex((value) => (value + 1) % count),
+      Math.max(0, ROTATE_MS - elapsed.current),
+    );
+    return () => {
+      window.clearTimeout(timer);
+      elapsed.current += Date.now() - started;
+    };
+  }, [index, stopped, count]);
+
+  // Keyboard focus pauses; a mouse click on a dot or « Lecture » must not
+  // leave the carousel frozen until something else is clicked.
+  function onFocusIn(event: FocusEvent<HTMLElement>) {
+    try {
+      if ((event.target as HTMLElement).matches(":focus-visible")) setPaused(true);
+    } catch {
+      // Old TV browsers without :focus-visible: never pause on focus.
+    }
+  }
 
   useEffect(() => {
     if (!items.length) return;
     let alive = true;
-    loadBackdrops(items.map((entry) => entry.id)).then((map) => {
-      if (alive) setBackdrops(map);
+    // Series stills come from their own id space (see loadBackdrops).
+    const films = items.filter((entry) => entry.type !== "series").map((entry) => entry.id);
+    const shows = items.filter((entry) => entry.type === "series").map((entry) => entry.id);
+    Promise.all([loadBackdrops(films), loadBackdrops(shows, true)]).then(([a, b]) => {
+      if (alive) setBackdrops({ ...a, ...b });
     });
     loadSynopses(items.map((entry) => ({ id: entry.id, series: entry.type === "series" }))).then((map) => {
       if (alive) setSynopses(map);
@@ -68,9 +109,7 @@ export default function Hero({ items, onPlay }: HeroProps) {
       aria-roledescription="carrousel"
       aria-label="À la une"
       style={{ "--mf-rotate": `${ROTATE_MS}ms` } as CSSProperties}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
+      onFocusCapture={onFocusIn}
       onBlurCapture={() => setPaused(false)}
     >
       <div className="mf-hero__stills" aria-hidden="true">
@@ -87,7 +126,7 @@ export default function Hero({ items, onPlay }: HeroProps) {
       </div>
       <div className="mf-hero__veil" aria-hidden="true" />
 
-      <div className="mf-hero__inner">
+      <div className="mf-hero__inner" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
         <p className="mf-eyebrow">
           <Sparkles size={14} /> À la une aujourd'hui
         </p>
@@ -108,7 +147,11 @@ export default function Hero({ items, onPlay }: HeroProps) {
       </div>
 
       {count > 1 ? (
-        <div className={`mf-hero__nav${paused ? " is-paused" : ""}`}>
+        <div
+          className={`mf-hero__nav${stopped ? " is-paused" : ""}`}
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
           <button type="button" className="mf-hero__arrow" aria-label="Titre précédent" onClick={() => go(-1)}>
             <ChevronLeft size={16} />
           </button>

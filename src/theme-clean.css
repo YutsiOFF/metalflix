@@ -604,6 +604,12 @@ body {
   max-width: 78%;
 }
 
+/* Le logo Disney+ est haut et fin : il lui faut plus de place que les autres. */
+.mf-studio--disney .mf-studio__logo {
+  height: clamp(3.4rem, 6.8vw, 7rem);
+  max-width: 82%;
+}
+
 .mf-studio__word {
   font-family: var(--mf-font);
   font-weight: 800;
