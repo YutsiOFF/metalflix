@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent as ReactPointerEvent, type TouchEvent } from "react";
 import { ChevronLeft, ChevronRight, Play, Sparkles } from "lucide-react";
 import type { Title } from "../lib/catalog";
 import { GENRE_LABEL } from "../lib/catalog";
@@ -96,6 +96,41 @@ export default function Hero({ items, onPlay }: HeroProps) {
     };
   }, [items]);
 
+  /**
+   * Finger swipe anywhere on the hero: left = next, right = previous. Only a
+   * clearly horizontal gesture counts, so scrolling the page down still works.
+   */
+  const swipe = useRef<{ x: number; y: number; t: number } | null>(null);
+  function onTouchStart(event: TouchEvent<HTMLElement>) {
+    if (event.touches.length !== 1) {
+      swipe.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    swipe.current = { x: touch.clientX, y: touch.clientY, t: Date.now() };
+  }
+  function onTouchEnd(event: TouchEvent<HTMLElement>) {
+    const start = swipe.current;
+    swipe.current = null;
+    if (!start || count < 2) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const fast = Date.now() - start.t < 300;
+    if (Math.abs(dx) < (fast ? 30 : 50) || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    setIndex((value) => (value + (dx < 0 ? 1 : -1) + count) % count);
+  }
+
+  // Hover pauses only for a real mouse: a tap on a phone fires mouseenter and
+  // never the matching mouseleave, which froze the carousel.
+  const hoverOn = (event: ReactPointerEvent) => {
+    if (event.pointerType === "mouse") setPaused(true);
+  };
+  const hoverOff = (event: ReactPointerEvent) => {
+    if (event.pointerType === "mouse") setPaused(false);
+  };
+
   const item = items[index] ?? items[0];
   if (!item) return null;
 
@@ -111,6 +146,9 @@ export default function Hero({ items, onPlay }: HeroProps) {
       style={{ "--mf-rotate": `${ROTATE_MS}ms` } as CSSProperties}
       onFocusCapture={onFocusIn}
       onBlurCapture={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={() => (swipe.current = null)}
     >
       <div className="mf-hero__stills" aria-hidden="true">
         {items.map((entry, position) => (
@@ -126,7 +164,7 @@ export default function Hero({ items, onPlay }: HeroProps) {
       </div>
       <div className="mf-hero__veil" aria-hidden="true" />
 
-      <div className="mf-hero__inner" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <div className="mf-hero__inner" onPointerEnter={hoverOn} onPointerLeave={hoverOff}>
         <p className="mf-eyebrow">
           <Sparkles size={14} /> À la une aujourd'hui
         </p>
@@ -149,8 +187,8 @@ export default function Hero({ items, onPlay }: HeroProps) {
       {count > 1 ? (
         <div
           className={`mf-hero__nav${stopped ? " is-paused" : ""}`}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
+          onPointerEnter={hoverOn}
+          onPointerLeave={hoverOff}
         >
           <button type="button" className="mf-hero__arrow" aria-label="Titre précédent" onClick={() => go(-1)}>
             <ChevronLeft size={16} />
